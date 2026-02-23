@@ -1,0 +1,73 @@
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
+nav{background:#1a1d27;border-bottom:1px solid #2d3148;padding:0 2rem;display:flex;align-items:center;gap:1.5rem;height:56px}
+nav .logo{font-size:1.2rem;font-weight:700;color:#7c8cff;letter-spacing:.1em;margin-right:auto}
+nav a{color:#94a3b8;text-decoration:none;font-size:.9rem;padding:.4rem .8rem;border-radius:6px;transition:all .2s;position:relative;white-space:nowrap}
+nav a:hover,nav a.active{color:#e2e8f0;background:#2d3148}
+nav a .badge{position:absolute;top:-4px;right:-4px;background:#7c8cff;color:#fff;border-radius:10px;font-size:.65rem;font-weight:700;padding:1px 5px;min-width:16px;text-align:center}
+.page{padding:2rem;max-width:1600px;margin:0 auto}
+h1{font-size:1.6rem;font-weight:700;color:#e2e8f0;margin-bottom:1.5rem}
+.controls{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;margin-bottom:1.5rem;background:#1a1d27;border:1px solid #2d3148;border-radius:10px;padding:1rem 1.25rem}
+.controls input[type="text"],.controls select,.controls input[type="number"]{background:#0f1117;border:1px solid #2d3148;border-radius:6px;color:#e2e8f0;padding:.5rem .75rem;font-size:.9rem;outline:none;transition:border-color .2s}
+.controls input[type="text"]{flex:1;min-width:160px}
+.controls input[type="number"]{width:72px}
+.controls select{cursor:pointer}
+.controls input:focus,.controls select:focus{border-color:#7c8cff}
+.controls label{font-size:.8rem;color:#64748b;white-space:nowrap}
+.controls .field-group{display:flex;align-items:center;gap:.5rem}
+.controls .divider{width:1px;height:24px;background:#2d3148;margin:0 .25rem}
+.btn{background:#7c8cff;color:#fff;border:none;border-radius:6px;padding:.5rem 1.1rem;font-size:.9rem;cursor:pointer;transition:background .2s;white-space:nowrap}
+.btn:hover{background:#6270e0}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.secondary{background:#2d3148;color:#94a3b8}
+.btn.secondary:hover{background:#3a3f5c;color:#e2e8f0}
+.btn.danger{background:#3d1a1a;color:#f87171}
+.btn.danger:hover{background:#5c2020}
+.btn.success{background:#14532d;color:#4ade80}
+.btn.success:hover{background:#166534}
+.btn.ghost{background:transparent;color:#64748b;border:1px solid #2d3148;padding:.35rem .75rem;font-size:.8rem}
+.btn.ghost:hover{background:#1a1d27;color:#94a3b8}
+.split-layout{display:grid;grid-template-columns:1fr 380px;gap:1.5rem;align-items:start}
+@media(max-width:1100px){.split-layout{grid-template-columns:1fr}}
+.chart-panel{background:#1a1d27;border:1px solid #2d3148;border-radius:10px;padding:1.25rem;height:340px;display:flex;flex-direction:column;position:sticky;top:1.5rem}
+.chart-panel .panel-title{font-size:.85rem;font-weight:600;color:#94a3b8;margin-bottom:.75rem;line-height:1.4;min-height:2.4rem}
+.chart-panel .panel-hint{flex:1;display:flex;align-items:center;justify-content:center;color:#334155;font-size:.8rem;text-align:center}
+.table-wrap{overflow-x:auto;border-radius:10px;border:1px solid #2d3148}
+table{width:100%;border-collapse:collapse;font-size:.875rem}
+thead tr{background:#1a1d27}
+th{padding:.75rem 1rem;text-align:left;color:#64748b;font-weight:600;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #2d3148;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:#94a3b8}
+th .sort-icon{margin-left:.3rem;opacity:.5}
+th.sorted .sort-icon{opacity:1;color:#7c8cff}
+td{padding:.65rem 1rem;border-bottom:1px solid #1e2235;color:#cbd5e1}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#1a1d27;cursor:pointer}
+tbody tr.selected{background:#1e2545}
+tbody tr.in-basket{background:#1a2535}
+.rank{color:#475569;font-weight:600;width:36px}
+.thumb{width:26px;height:26px;border-radius:4px;object-fit:contain;background:#2d3148}
+.badge-type{display:inline-block;padding:.15rem .5rem;border-radius:20px;font-size:.7rem;font-weight:600;background:#1e2545;color:#7c8cff}
+.badge-country{display:inline-block;padding:.15rem .5rem;border-radius:20px;font-size:.7rem;font-weight:600;background:#1e3030;color:#4ade80}
+.works{font-weight:700;color:#7c8cff}
+.frac{font-weight:600;color:#a78bfa;font-size:.85rem}
+.desc{color:#64748b;font-size:.8rem;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status{padding:2rem;text-align:center;color:#475569;font-size:.9rem}
+.tbl-footer{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-top:1px solid #2d3148;background:#1a1d27;border-radius:0 0 10px 10px;font-size:.8rem;color:#475569}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:2rem}
+.card{background:#1a1d27;border:1px solid #2d3148;border-radius:10px;padding:1.25rem;cursor:pointer;transition:border-color .2s}
+.card:hover{border-color:#7c8cff}
+.card .val{font-size:2rem;font-weight:700;color:#7c8cff}
+.card .lbl{font-size:.8rem;color:#64748b;margin-top:.25rem}
+.stat-box{background:#1a1d27;border:1px solid #2d3148;border-radius:10px;padding:1.5rem;text-align:center}
+.stat-box .stat-val{font-size:2.2rem;font-weight:700;color:#7c8cff}
+.stat-box .stat-frac{font-size:1.1rem;color:#a78bfa;margin-top:.2rem}
+.stat-box .stat-lbl{font-size:.8rem;color:#64748b;margin-top:.5rem}
+.basket-item{display:flex;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:#1a1d27;border:1px solid #2d3148;border-radius:8px;margin-bottom:.5rem}
+.basket-item .bi-name{font-size:.9rem;color:#e2e8f0}
+.basket-item .bi-meta{font-size:.75rem;color:#475569;margin-top:.1rem}
+.results-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem}
+@media(max-width:900px){.results-grid{grid-template-columns:1fr}}
+.section-title{font-size:.85rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem}

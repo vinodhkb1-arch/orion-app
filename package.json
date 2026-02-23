@@ -1,0 +1,14 @@
+{
+  "name": "orion-client",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "recharts": "^2.10.3"
+  },
+  "scripts": { "build": "react-scripts build" },
+  "proxy": "http://localhost:8080",
+  "browserslist": { "production": [">0.2%"] }
+}
