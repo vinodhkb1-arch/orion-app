@@ -27,7 +27,6 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
   };
 
   const apply = () => fetchData(yearFrom, yearTo, q, field);
-  const reset = () => { setQ('');setField('name');setYF(2020);setYT(2025);setFunderData({rows:[],yearFrom:2020,yearTo:2025});setSel(null);setTrends([]); };
 
   const pick = row => {
     if (sel?.funder_id===row.funder_id) { setSel(null);setTrends([]);return; }
@@ -103,6 +102,7 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
               </table>
               <div className="tbl-footer">
                 <span>Showing {visibleRows.length} of {rows.length} results</span>
+                {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
               </div>
             </div>
           )}
