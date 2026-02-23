@@ -1,27 +1,11 @@
-substitutions:
-  _GITHUB_REPO_OWNER: ''
-  _GITHUB_REPO_NAME: ''
-  _BRANCH: 'main'
-
 steps:
-  # Clone the repo from GitHub
-  - name: 'gcr.io/cloud-builders/git'
-    args:
-      - 'clone'
-      - '--branch'
-      - '$_BRANCH'
-      - '--depth'
-      - '1'
-      - 'https://github.com/$_GITHUB_REPO_OWNER/$_GITHUB_REPO_NAME.git'
-      - 'source'
-
-  # Build the Docker image from the cloned source
+  # Build the Docker image from the current directory
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
       - 'gcr.io/$PROJECT_ID/orion-app'
-      - './source'
+      - '.'
 
   # Push to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
