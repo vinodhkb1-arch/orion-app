@@ -1,16 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 export default function LoginGate() {
-  const [projectId, setProjectId] = useState('');
-  const [error, setError]         = useState('');
-
-  const handleLogin = () => {
-    const pid = projectId.trim();
-    if (!pid) { setError('Please enter your GCP Project ID.'); return; }
-    // Redirect to backend — backend will redirect to Google OAuth
-    window.location.href = `/auth/login?project_id=${encodeURIComponent(pid)}`;
-  };
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -25,61 +15,24 @@ export default function LoginGate() {
         borderRadius: '14px',
         padding: '2.5rem',
         width: '100%',
-        maxWidth: '420px',
+        maxWidth: '380px',
+        textAlign: 'center',
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '.5rem' }}>⭐</div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '.4rem' }}>
-            ORION
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '.875rem' }}>
-            Research Dashboard
-          </p>
-        </div>
+        <div style={{ fontSize: '2.5rem', marginBottom: '.5rem' }}>⭐</div>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '.4rem' }}>
+          ORION
+        </h1>
+        <p style={{ color: '#64748b', fontSize: '.875rem', marginBottom: '2rem' }}>
+          Research Dashboard
+        </p>
 
-        <div style={{ marginBottom: '1.25rem' }}>
-          <label style={{ display: 'block', fontSize: '.8rem', color: '#64748b', marginBottom: '.4rem' }}>
-            Your GCP Project ID
-          </label>
-          <input
-            type="text"
-            placeholder="my-gcp-project-123"
-            value={projectId}
-            onChange={e => { setProjectId(e.target.value); setError(''); }}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            style={{
-              width: '100%',
-              background: '#0f1117',
-              border: '1px solid #2d3148',
-              borderRadius: '6px',
-              color: '#e2e8f0',
-              padding: '.6rem .85rem',
-              fontSize: '.9rem',
-              outline: 'none',
-            }}
-          />
-          <p style={{ color: '#475569', fontSize: '.75rem', marginTop: '.4rem' }}>
-            Queries will be billed to this project.{' '}
-            <a
-              href="https://console.cloud.google.com/home/dashboard"
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: '#7c8cff' }}
-            >
-              Find it in the GCP console ↗
-            </a>
-          </p>
-        </div>
-
-        {error && (
-          <div style={{ color: '#f87171', fontSize: '.8rem', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
-
-        <button
-          onClick={handleLogin}
+        <a
+          href="/auth/login"
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '.6rem',
             width: '100%',
             background: '#fff',
             color: '#0f1117',
@@ -89,24 +42,21 @@ export default function LoginGate() {
             fontSize: '.95rem',
             fontWeight: 600,
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '.6rem',
+            textDecoration: 'none',
+            boxSizing: 'border-box',
           }}
         >
           <GoogleIcon />
           Sign in with Google
-        </button>
+        </a>
 
         <p style={{
           color: '#334155',
           fontSize: '.72rem',
           marginTop: '1.5rem',
-          lineHeight: 1.5,
-          textAlign: 'center',
+          lineHeight: 1.6,
         }}>
-          ORION will request read-only BigQuery access on your behalf.
+          Your Google account is used for access only.
           You can revoke access at any time from your{' '}
           <a href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer" style={{ color: '#475569' }}>
             Google account settings
