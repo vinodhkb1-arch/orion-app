@@ -10,8 +10,8 @@ export default function App() {
   const [instBasket,   setInstBasket]   = useState([]);
   const [funderBasket, setFunderBasket] = useState([]);
   // Persisted table data — survives tab switches
-  const [instData,   setInstData]   = useState({ rows: [], yearFrom: 2000, yearTo: 2025 });
-  const [funderData, setFunderData] = useState({ rows: [], yearFrom: 2000, yearTo: 2025 });
+  const [instData,   setInstData]   = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
+  const [funderData, setFunderData] = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
 
   const addInst    = r => setInstBasket(p => p.find(b=>b.institution_id===r.institution_id) ? p : [...p,{institution_id:r.institution_id,name:r.name,country:r.country,type:r.type}]);
   const removeInst = id => setInstBasket(p => p.filter(b=>b.institution_id!==id));

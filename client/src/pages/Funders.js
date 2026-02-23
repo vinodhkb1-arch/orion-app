@@ -11,24 +11,23 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
   const [field, setField]       = useState('name');
   const [yearFrom, setYF]       = useState(fetchedYF);
   const [yearTo, setYT]         = useState(fetchedYT);
-  const [pendingLimit, setPL]   = useState(50);
   const [sel, setSel]           = useState(null);
   const [trends, setTrends]     = useState([]);
   const [tl, setTl]             = useState(false);
-  const { visibleRows, setDisplayLimit, onSort, sortIcon, sortKey } = useTable(rows, 50);
+  const { visibleRows, onSort, sortIcon, sortKey } = useTable(rows, 1000);
 
   const fetchData = (yf, yt, sq, sf) => {
     setLoading(true);
     const url = sq.trim()
-      ? `/api/funders/search?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}`
-      : `/api/funders/top?year_from=${yf}&year_to=${yt}`;
+      ? `/api/funders/search?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=1000`
+      : `/api/funders/top?year_from=${yf}&year_to=${yt}&limit=1000`;
     fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
       .then(d=>{ setFunderData({rows:d,yearFrom:yf,yearTo:yt}); setLoading(false); })
       .catch(()=>{ setFunderData({rows:[],yearFrom:yf,yearTo:yt}); setLoading(false); });
   };
 
   const apply = () => fetchData(yearFrom, yearTo, q, field);
-  const reset = () => { setQ('');setField('name');setYF(2000);setYT(2025);setPL(50);setFunderData({rows:[],yearFrom:2000,yearTo:2025});setSel(null);setTrends([]); };
+  const reset = () => { setQ('');setField('name');setYF(2020);setYT(2025);setFunderData({rows:[],yearFrom:2020,yearTo:2025});setSel(null);setTrends([]); };
 
   const pick = row => {
     if (sel?.funder_id===row.funder_id) { setSel(null);setTrends([]);return; }
@@ -66,10 +65,7 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
           <input type="number" value={yearTo} onChange={e=>setYT(Number(e.target.value))}/>
         </div>
         <button className="btn" onClick={apply}>Search</button>
-        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'.5rem'}}>
-          <input type="number" value={pendingLimit} onChange={e=>setPL(Number(e.target.value))} style={{width:64,background:'#0f1117',border:'1px solid #2d3148',borderRadius:6,color:'#e2e8f0',padding:'.5rem .75rem',fontSize:'.9rem',outline:'none'}}/>
-          <button className="btn" onClick={()=>setDisplayLimit(pendingLimit)}>Change list length</button>
-        </div>
+        <button className="btn secondary" onClick={reset}>Reset</button>
       </div>
 
       <div className="split-layout">
@@ -107,8 +103,7 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
                 </tbody>
               </table>
               <div className="tbl-footer">
-                <span>Showing {visibleRows.length} of {rows.length} loaded</span>
-                <span style={{color:'#334155',fontSize:'.75rem'}}>Use "Change list length" to adjust visible rows without re-querying</span>
+                <span>Showing {visibleRows.length} of {rows.length} results</span>
               </div>
             </div>
           )}
