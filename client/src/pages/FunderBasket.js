@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import useTable from './useTable';
 
-export default function FunderBasket({ basket, removeFromBasket }) {
-  const [yearFrom, setYF]     = useState(2020);
-  const [yearTo, setYT]       = useState(2025);
-  const [results, setResults] = useState(null);
+export default function FunderBasket({ basket, removeFromBasket, basketData, setBasketData }) {
+  const { results, yearFrom: savedYF, yearTo: savedYT } = basketData;
+  const [yearFrom, setYF]     = useState(savedYF);
+  const [yearTo, setYT]       = useState(savedYT);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const instTable = useTable(results?.institutions || [], 1000);
@@ -17,7 +17,7 @@ export default function FunderBasket({ basket, removeFromBasket }) {
       body: JSON.stringify({ funder_ids: basket.map(b=>Number(b.funder_id)), year_from:yearFrom, year_to:yearTo, limit:1000 }),
     })
       .then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(d=>{ setResults(d); setLoading(false); })
+      .then(d=>{ setBasketData({ results: d, yearFrom, yearTo }); setLoading(false); })
       .catch(e=>{ setError(`Query failed (${e.message})`); setLoading(false); });
   };
 
@@ -55,7 +55,7 @@ export default function FunderBasket({ basket, removeFromBasket }) {
               <div className="cards" style={{gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))'}}>
                 <div className="stat-box">
                   <div className="stat-val">{Number(results.total_works).toLocaleString()}</div>
-                  <div className="stat-lbl">Total funded works {yearFrom}–{yearTo}<br/><small style={{color:'#334155'}}>No double counting</small></div>
+                  <div className="stat-lbl">Total funded works {savedYF}–{savedYT}<br/><small style={{color:'#334155'}}>No double counting</small></div>
                 </div>
                 <div className="stat-box"><div className="stat-val">{basket.length}</div><div className="stat-lbl">Funders</div></div>
               </div>
@@ -89,3 +89,4 @@ export default function FunderBasket({ basket, removeFromBasket }) {
     </div>
   );
 }
+

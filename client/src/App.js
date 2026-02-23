@@ -10,13 +10,16 @@ export default function App() {
   const [instBasket,   setInstBasket]   = useState([]);
   const [funderBasket, setFunderBasket] = useState([]);
   // Persisted table data — survives tab switches
-  const [instData,   setInstData]   = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
-  const [funderData, setFunderData] = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
+  const [instData,        setInstData]        = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
+  const [funderData,      setFunderData]      = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
+  // Persisted basket results — survives tab switches
+  const [instBasketData,    setInstBasketData]    = useState({ results: null, yearFrom: 2020, yearTo: 2025 });
+  const [funderBasketData,  setFunderBasketData]  = useState({ results: null, yearFrom: 2020, yearTo: 2025 });
 
   const addInst    = r => setInstBasket(p => p.find(b=>b.institution_id===r.institution_id) ? p : [...p,{institution_id:r.institution_id,name:r.name,country:r.country,type:r.type}]);
-  const removeInst = id => setInstBasket(p => p.filter(b=>b.institution_id!==id));
+  const removeInst = id => { setInstBasket(p => p.filter(b=>b.institution_id!==id)); setInstBasketData({ results: null, yearFrom: 2020, yearTo: 2025 }); };
   const addFunder    = r => setFunderBasket(p => p.find(b=>b.funder_id===r.funder_id) ? p : [...p,{funder_id:r.funder_id,name:r.name,country:r.country}]);
-  const removeFunder = id => setFunderBasket(p => p.filter(b=>b.funder_id!==id));
+  const removeFunder = id => { setFunderBasket(p => p.filter(b=>b.funder_id!==id)); setFunderBasketData({ results: null, yearFrom: 2020, yearTo: 2025 }); };
 
   const navItem = (key, label, count) => (
     <a key={key} href="#" className={page===key?'active':''} onClick={e=>{e.preventDefault();setPage(key);}}>
@@ -37,8 +40,8 @@ export default function App() {
       {page==='overview'      && <Overview setPage={setPage}/>}
       {page==='institutions'  && <Institutions instData={instData} setInstData={setInstData} basket={instBasket} addToBasket={addInst}/>}
       {page==='funders'       && <Funders funderData={funderData} setFunderData={setFunderData} basket={funderBasket} addToBasket={addFunder}/>}
-      {page==='inst-basket'   && <InstBasket basket={instBasket} removeFromBasket={removeInst}/>}
-      {page==='funder-basket' && <FunderBasket basket={funderBasket} removeFromBasket={removeFunder}/>}
+      {page==='inst-basket'   && <InstBasket basket={instBasket} removeFromBasket={removeInst} basketData={instBasketData} setBasketData={setInstBasketData}/>}
+      {page==='funder-basket' && <FunderBasket basket={funderBasket} removeFromBasket={removeFunder} basketData={funderBasketData} setBasketData={setFunderBasketData}/>}
     </>
   );
 }

@@ -66,7 +66,6 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
           <input type="number" value={yearTo} onChange={e=>setYT(Number(e.target.value))}/>
         </div>
         <button className="btn" onClick={apply}>Search</button>
-        <button className="btn secondary" onClick={reset}>Reset</button>
       </div>
 
       <div className="split-layout">
