@@ -1,28 +1,136 @@
 import os
-from fastapi import FastAPI, Query
+import json
+import time
+import hashlib
+import hmac
+import base64
+
+from fastapi import FastAPI, Query, Request, HTTPException
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import List
+
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request as GoogleRequest
+from google_auth_oauthlib.flow import Flow
 from google.cloud import bigquery
+from dotenv import load_dotenv
 
-app = FastAPI()
-bq = bigquery.Client()
+load_dotenv()
 
-SOURCE = "cwts-leiden.openalex_2025aug"
-CACHE  = "dashboard-488117.orion_cache"
+# ── Config ────────────────────────────────────────────────────────────────────
+
+OAUTH_CLIENT_ID     = os.environ["OAUTH_CLIENT_ID"]
+OAUTH_CLIENT_SECRET = os.environ["OAUTH_CLIENT_SECRET"]
+OAUTH_REDIRECT_URI  = os.environ["OAUTH_REDIRECT_URI"]   # e.g. https://your-app.run.app/auth/callback
+SESSION_SECRET      = os.environ["SESSION_SECRET"]        # any long random string
+
+SOURCE   = "cwts-leiden.openalex_2025aug"
+BQ_CACHE = "dashboard-488117.orion_cache"
+
+SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/bigquery",
+]
 
 CACHE_1H  = "public, max-age=3600"
 CACHE_OFF = "no-store"
 
+app = FastAPI()
 
-def run_query(sql: str, params: dict) -> list[dict]:
+# ── Session helpers (signed cookie, no DB needed) ─────────────────────────────
+
+def _sign(data: str) -> str:
+    sig = hmac.new(SESSION_SECRET.encode(), data.encode(), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(sig).decode()
+
+def encode_session(payload: dict) -> str:
+    body = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+    return f"{body}.{_sign(body)}"
+
+def decode_session(cookie: str) -> dict | None:
+    try:
+        body, sig = cookie.rsplit(".", 1)
+        if not hmac.compare_digest(sig, _sign(body)):
+            return None
+        return json.loads(base64.urlsafe_b64decode(body).encode())
+    except Exception:
+        return None
+
+def get_session(request: Request) -> dict:
+    raw = request.cookies.get("orion_session")
+    if not raw:
+        return {}
+    return decode_session(raw) or {}
+
+def set_session(response, payload: dict):
+    response.set_cookie(
+        "orion_session",
+        encode_session(payload),
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 8,  # 8 hours
+    )
+
+# ── OAuth helpers ─────────────────────────────────────────────────────────────
+
+def make_flow(state: str | None = None) -> Flow:
+    client_config = {
+        "web": {
+            "client_id": OAUTH_CLIENT_ID,
+            "client_secret": OAUTH_CLIENT_SECRET,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [OAUTH_REDIRECT_URI],
+        }
+    }
+    flow = Flow.from_client_config(client_config, scopes=SCOPES, state=state)
+    flow.redirect_uri = OAUTH_REDIRECT_URI
+    return flow
+
+def get_credentials(session: dict) -> Credentials | None:
+    """Rebuild Credentials from session, refreshing if expired."""
+    if "token" not in session:
+        return None
+    creds = Credentials(
+        token=session["token"],
+        refresh_token=session.get("refresh_token"),
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=OAUTH_CLIENT_ID,
+        client_secret=OAUTH_CLIENT_SECRET,
+        scopes=SCOPES,
+        expiry=None,  # let google-auth check via refresh
+    )
+    # Refresh if expired
+    if session.get("token_expiry", 0) < time.time() + 60:
+        try:
+            creds.refresh(GoogleRequest())
+        except Exception:
+            return None
+    return creds
+
+def require_auth(request: Request) -> tuple[dict, Credentials]:
+    """Returns (session, credentials) or raises 401."""
+    session = get_session(request)
+    creds = get_credentials(session)
+    if not creds:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if not session.get("project_id"):
+        raise HTTPException(status_code=401, detail="No GCP project configured")
+    return session, creds
+
+# ── BigQuery runner ───────────────────────────────────────────────────────────
+
+def run_query(sql: str, params: dict, creds: Credentials, project_id: str) -> list[dict]:
     """
-    Run a parameterised BigQuery query.
-    institution_id and funder_id are INT64 in BQ.
-    Pass a list[int] value to use ARRAY parameter (for IN UNNEST(@param) clauses).
-    All result values cast to plain Python types for JSON serialisation.
+    Run a parameterised BigQuery query using the USER's credentials and project.
+    They get billed, not us.
     """
+    bq = bigquery.Client(credentials=creds, project=project_id)
     bq_params = []
     for name, value in params.items():
         if isinstance(value, list):
@@ -39,9 +147,9 @@ def run_query(sql: str, params: dict) -> list[dict]:
         for key, value in row.items():
             if value is None:
                 d[key] = None
-            elif hasattr(value, 'item'):
+            elif hasattr(value, "item"):
                 d[key] = value.item()
-            elif type(value).__name__ == 'Decimal':
+            elif type(value).__name__ == "Decimal":
                 d[key] = float(value)
             elif isinstance(value, float):
                 d[key] = round(value, 4)
@@ -52,20 +160,75 @@ def run_query(sql: str, params: dict) -> list[dict]:
         result.append(d)
     return result
 
-
 def cached(data, max_age: str = CACHE_1H):
-    """Wrap a list/dict result in a JSONResponse with a Cache-Control header."""
     return JSONResponse(content=data, headers={"Cache-Control": max_age})
 
+# ── Auth endpoints ─────────────────────────────────────────────────────────────
+
+@app.get("/auth/login")
+def auth_login(project_id: str = Query(..., description="User's GCP project ID")):
+    flow = make_flow()
+    auth_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",           # always show consent so we always get refresh_token
+    )
+    # Stash state + project_id in a short-lived pre-session cookie
+    pre = encode_session({"oauth_state": state, "project_id": project_id})
+    response = RedirectResponse(auth_url)
+    response.set_cookie("orion_pre", pre, httponly=True, secure=True, samesite="lax", max_age=300)
+    return response
+
+@app.get("/auth/callback")
+def auth_callback(request: Request, code: str = Query(...), state: str = Query(...)):
+    pre_raw = request.cookies.get("orion_pre")
+    pre = decode_session(pre_raw) if pre_raw else {}
+
+    if not pre or pre.get("oauth_state") != state:
+        raise HTTPException(status_code=400, detail="OAuth state mismatch — possible CSRF")
+
+    flow = make_flow(state=state)
+    flow.fetch_token(code=code)
+    creds = flow.credentials
+
+    session = {
+        "token":         creds.token,
+        "refresh_token": creds.refresh_token,
+        "token_expiry":  time.time() + 3600,
+        "project_id":    pre["project_id"],
+    }
+
+    response = RedirectResponse("/")
+    response.delete_cookie("orion_pre")
+    set_session(response, session)
+    return response
+
+@app.get("/auth/logout")
+def auth_logout():
+    response = RedirectResponse("/")
+    response.delete_cookie("orion_session")
+    return response
+
+@app.get("/auth/me")
+def auth_me(request: Request):
+    session = get_session(request)
+    if not session.get("token"):
+        return JSONResponse({"authenticated": False})
+    return JSONResponse({
+        "authenticated": True,
+        "project_id": session.get("project_id"),
+    })
 
 # ── Institutions ──────────────────────────────────────────────────────────────
 
 @app.get("/api/institutions/top")
 def institutions_top(
+    request: Request,
     limit: int = Query(default=1000, ge=1, le=5000),
     year_from: int = Query(default=2000),
     year_to: int = Query(default=2025),
 ):
+    session, creds = require_auth(request)
     sql = f"""
         SELECT
             i.institution_id, i.institution AS name,
@@ -76,25 +239,26 @@ def institutions_top(
             COALESCE(SUM(fc.fractional_count), 0) AS fractional_count
         FROM `{SOURCE}.institution` i
         LEFT JOIN `{SOURCE}.institution_type` it ON i.institution_type_id = it.institution_type_id
-        LEFT JOIN `{CACHE}.orion_works_counts` wc
+        LEFT JOIN `{BQ_CACHE}.orion_works_counts` wc
             ON i.institution_id = wc.institution_id AND wc.pub_year BETWEEN @year_from AND @year_to
-        LEFT JOIN `{CACHE}.orion_fractional_counts` fc
+        LEFT JOIN `{BQ_CACHE}.orion_fractional_counts` fc
             ON i.institution_id = fc.institution_id AND fc.pub_year BETWEEN @year_from AND @year_to
         GROUP BY 1,2,3,4,5,6
         ORDER BY works_count DESC
         LIMIT @limit
     """
-    return cached(run_query(sql, {"limit": limit, "year_from": year_from, "year_to": year_to}))
-
+    return cached(run_query(sql, {"limit": limit, "year_from": year_from, "year_to": year_to}, creds, session["project_id"]))
 
 @app.get("/api/institutions/search")
 def institutions_search(
+    request: Request,
     q: str = Query(default=""),
     field: str = Query(default="name"),
     limit: int = Query(default=1000, ge=1, le=5000),
     year_from: int = Query(default=2000),
     year_to: int = Query(default=2025),
 ):
+    session, creds = require_auth(request)
     if not q.strip():
         return cached([])
     field_map = {"name": "i.institution", "country": "i.country_iso_alpha2_code", "type": "it.institution_type"}
@@ -109,40 +273,41 @@ def institutions_search(
             COALESCE(SUM(fc.fractional_count), 0) AS fractional_count
         FROM `{SOURCE}.institution` i
         LEFT JOIN `{SOURCE}.institution_type` it ON i.institution_type_id = it.institution_type_id
-        LEFT JOIN `{CACHE}.orion_works_counts` wc
+        LEFT JOIN `{BQ_CACHE}.orion_works_counts` wc
             ON i.institution_id = wc.institution_id AND wc.pub_year BETWEEN @year_from AND @year_to
-        LEFT JOIN `{CACHE}.orion_fractional_counts` fc
+        LEFT JOIN `{BQ_CACHE}.orion_fractional_counts` fc
             ON i.institution_id = fc.institution_id AND fc.pub_year BETWEEN @year_from AND @year_to
         WHERE LOWER({col}) LIKE @pattern
         GROUP BY 1,2,3,4,5,6
         ORDER BY works_count DESC
         LIMIT @limit
     """
-    return cached(run_query(sql, {"pattern": f"%{q.lower()}%", "limit": limit, "year_from": year_from, "year_to": year_to}))
-
+    return cached(run_query(sql, {"pattern": f"%{q.lower()}%", "limit": limit, "year_from": year_from, "year_to": year_to}, creds, session["project_id"]))
 
 @app.get("/api/institutions/{institution_id}/trends")
-def institution_trends(institution_id: int):
+def institution_trends(request: Request, institution_id: int):
+    session, creds = require_auth(request)
     sql = f"""
         SELECT wc.pub_year AS year, wc.works_count,
                COALESCE(fc.fractional_count, 0) AS fractional_count
-        FROM `{CACHE}.orion_works_counts` wc
-        LEFT JOIN `{CACHE}.orion_fractional_counts` fc
+        FROM `{BQ_CACHE}.orion_works_counts` wc
+        LEFT JOIN `{BQ_CACHE}.orion_fractional_counts` fc
             ON wc.institution_id = fc.institution_id AND wc.pub_year = fc.pub_year
         WHERE wc.institution_id = @id
         ORDER BY year
     """
-    return cached(run_query(sql, {"id": institution_id}))
-
+    return cached(run_query(sql, {"id": institution_id}, creds, session["project_id"]))
 
 # ── Funders ───────────────────────────────────────────────────────────────────
 
 @app.get("/api/funders/top")
 def funders_top(
+    request: Request,
     limit: int = Query(default=1000, ge=1, le=5000),
     year_from: int = Query(default=2000),
     year_to: int = Query(default=2025),
 ):
+    session, creds = require_auth(request)
     sql = f"""
         SELECT f.funder_id, f.funder AS name, f.country_iso_alpha2_code AS country,
                f.description, f.thumbnail_url, f.openalex_id,
@@ -155,17 +320,18 @@ def funders_top(
         ORDER BY works_count DESC
         LIMIT @limit
     """
-    return cached(run_query(sql, {"limit": limit, "year_from": year_from, "year_to": year_to}))
-
+    return cached(run_query(sql, {"limit": limit, "year_from": year_from, "year_to": year_to}, creds, session["project_id"]))
 
 @app.get("/api/funders/search")
 def funders_search(
+    request: Request,
     q: str = Query(default=""),
     field: str = Query(default="name"),
     limit: int = Query(default=1000, ge=1, le=5000),
     year_from: int = Query(default=2000),
     year_to: int = Query(default=2025),
 ):
+    session, creds = require_auth(request)
     if not q.strip():
         return cached([])
     field_map = {"name": "f.funder", "country": "f.country_iso_alpha2_code", "description": "f.description"}
@@ -183,11 +349,11 @@ def funders_search(
         ORDER BY works_count DESC
         LIMIT @limit
     """
-    return cached(run_query(sql, {"pattern": f"%{q.lower()}%", "limit": limit, "year_from": year_from, "year_to": year_to}))
-
+    return cached(run_query(sql, {"pattern": f"%{q.lower()}%", "limit": limit, "year_from": year_from, "year_to": year_to}, creds, session["project_id"]))
 
 @app.get("/api/funders/{funder_id}/trends")
-def funder_trends(funder_id: int):
+def funder_trends(request: Request, funder_id: int):
+    session, creds = require_auth(request)
     sql = f"""
         SELECT w.pub_year AS year, COUNT(DISTINCT wg.work_id) AS works
         FROM `{SOURCE}.work_grant` wg
@@ -195,8 +361,7 @@ def funder_trends(funder_id: int):
         WHERE wg.funder_id = @id
         GROUP BY year ORDER BY year
     """
-    return cached(run_query(sql, {"id": funder_id}))
-
+    return cached(run_query(sql, {"id": funder_id}, creds, session["project_id"]))
 
 # ── Institution Basket ────────────────────────────────────────────────────────
 
@@ -206,14 +371,14 @@ class InstBasketRequest(BaseModel):
     year_to: int = 2025
     limit: int = 50
 
-
 @app.post("/api/basket/institutions/analyze")
-def basket_institutions_analyze(req: InstBasketRequest):
+def basket_institutions_analyze(req: InstBasketRequest, request: Request):
+    session, creds = require_auth(request)
+    pid = session["project_id"]
     if not req.institution_ids:
         return cached({"total_works": 0, "total_fractional": 0.0, "funders": [], "collaborators": []}, CACHE_OFF)
 
-    yf, yt, lim = req.year_from, req.year_to, req.limit
-    ids = req.institution_ids
+    yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.institution_ids
 
     total_works = run_query(f"""
         SELECT COUNT(DISTINCT wai.work_id) AS total_works
@@ -221,14 +386,14 @@ def basket_institutions_analyze(req: InstBasketRequest):
         JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
         WHERE wai.institution_id IN UNNEST(@ids)
           AND w.pub_year BETWEEN @year_from AND @year_to
-    """, {"ids": ids, "year_from": yf, "year_to": yt})
+    """, {"ids": ids, "year_from": yf, "year_to": yt}, creds, pid)
 
     total_frac = run_query(f"""
         SELECT COALESCE(SUM(fractional_count), 0) AS total_fractional
-        FROM `{CACHE}.orion_fractional_counts`
+        FROM `{BQ_CACHE}.orion_fractional_counts`
         WHERE institution_id IN UNNEST(@ids)
           AND pub_year BETWEEN @year_from AND @year_to
-    """, {"ids": ids, "year_from": yf, "year_to": yt})
+    """, {"ids": ids, "year_from": yf, "year_to": yt}, creds, pid)
 
     funders = run_query(f"""
         SELECT f.funder_id, f.funder AS name, f.country_iso_alpha2_code AS country,
@@ -241,7 +406,7 @@ def basket_institutions_analyze(req: InstBasketRequest):
           AND w.pub_year BETWEEN @year_from AND @year_to
         GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code
         ORDER BY works_count DESC LIMIT @limit
-    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim})
+    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, creds, pid)
 
     collaborators = run_query(f"""
         SELECT i.institution_id, i.institution AS name, i.country_iso_alpha2_code AS country,
@@ -256,7 +421,7 @@ def basket_institutions_analyze(req: InstBasketRequest):
           AND w.pub_year BETWEEN @year_from AND @year_to
         GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code
         ORDER BY works_count DESC LIMIT @limit
-    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim})
+    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, creds, pid)
 
     return cached({
         "total_works": total_works[0]["total_works"] if total_works else 0,
@@ -264,7 +429,6 @@ def basket_institutions_analyze(req: InstBasketRequest):
         "funders": funders,
         "collaborators": collaborators,
     }, CACHE_OFF)
-
 
 # ── Funder Basket ─────────────────────────────────────────────────────────────
 
@@ -274,14 +438,14 @@ class FunderBasketRequest(BaseModel):
     year_to: int = 2025
     limit: int = 50
 
-
 @app.post("/api/basket/funders/analyze")
-def basket_funders_analyze(req: FunderBasketRequest):
+def basket_funders_analyze(req: FunderBasketRequest, request: Request):
+    session, creds = require_auth(request)
+    pid = session["project_id"]
     if not req.funder_ids:
         return cached({"total_works": 0, "institutions": []}, CACHE_OFF)
 
-    yf, yt, lim = req.year_from, req.year_to, req.limit
-    ids = req.funder_ids
+    yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.funder_ids
 
     total_works = run_query(f"""
         SELECT COUNT(DISTINCT wg.work_id) AS total_works
@@ -289,7 +453,7 @@ def basket_funders_analyze(req: FunderBasketRequest):
         JOIN `{SOURCE}.work` w ON wg.work_id = w.work_id
         WHERE wg.funder_id IN UNNEST(@ids)
           AND w.pub_year BETWEEN @year_from AND @year_to
-    """, {"ids": ids, "year_from": yf, "year_to": yt})
+    """, {"ids": ids, "year_from": yf, "year_to": yt}, creds, pid)
 
     institutions = run_query(f"""
         SELECT i.institution_id, i.institution AS name, i.country_iso_alpha2_code AS country,
@@ -303,13 +467,12 @@ def basket_funders_analyze(req: FunderBasketRequest):
           AND w.pub_year BETWEEN @year_from AND @year_to
         GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code, it.institution_type
         ORDER BY works_count DESC LIMIT @limit
-    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim})
+    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, creds, pid)
 
     return cached({
         "total_works": total_works[0]["total_works"] if total_works else 0,
         "institutions": institutions,
     }, CACHE_OFF)
-
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import useTable from './useTable';
+import { apiFetch } from '../api';
 
 const FIELDS = [{value:'name',label:'Name'},{value:'country',label:'Country (ISO)'},{value:'type',label:'Type'}];
 
@@ -21,9 +22,9 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
     const url = sq.trim()
       ? `/api/institutions/search?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=1000`
       : `/api/institutions/top?year_from=${yf}&year_to=${yt}&limit=1000`;
-    fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(d=>{ setInstData({rows:d,yearFrom:yf,yearTo:yt}); setLoading(false); })
-      .catch(()=>{ setInstData({rows:[],yearFrom:yf,yearTo:yt}); setLoading(false); });
+    apiFetch(url)
+      .then(d => { if (d) { setInstData({rows:d,yearFrom:yf,yearTo:yt}); } setLoading(false); })
+      .catch(() => { setInstData({rows:[],yearFrom:yf,yearTo:yt}); setLoading(false); });
   };
 
   const apply = () => fetchData(yearFrom, yearTo, q, field);
@@ -31,14 +32,12 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
   const pick = row => {
     if (sel?.institution_id===row.institution_id) { setSel(null);setTrends([]);return; }
     setSel(row); setTl(true);
-    fetch(`/api/institutions/${row.institution_id}/trends`)
-      .then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(d=>{ setTrends(d); setTl(false); })
-      .catch(()=>setTl(false));
+    apiFetch(`/api/institutions/${row.institution_id}/trends`)
+      .then(d => { if (d) setTrends(d); setTl(false); })
+      .catch(() => setTl(false));
   };
 
   const inBasket = id => basket.some(b=>b.institution_id===id);
-  // Limit chart x-axis to the year range used in the search
   const filteredTrends = trends.filter(t => t.year >= fetchedYF && t.year <= fetchedYT);
 
   const SortTh = ({k,children}) => (

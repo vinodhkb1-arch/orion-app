@@ -1,20 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Overview from './pages/Overview';
 import Institutions from './pages/Institutions';
 import Funders from './pages/Funders';
 import InstBasket from './pages/InstBasket';
 import FunderBasket from './pages/FunderBasket';
+import LoginGate from './pages/LoginGate';
 
 export default function App() {
-  const [page, setPage] = useState('overview');
+  const [authState, setAuthState]   = useState(null); // null=loading, false=logged out, object=logged in
+  const [page, setPage]             = useState('overview');
   const [instBasket,   setInstBasket]   = useState([]);
   const [funderBasket, setFunderBasket] = useState([]);
-  // Persisted table data — survives tab switches
   const [instData,        setInstData]        = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
   const [funderData,      setFunderData]      = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
-  // Persisted basket results — survives tab switches
   const [instBasketData,    setInstBasketData]    = useState({ results: null, yearFrom: 2020, yearTo: 2025 });
   const [funderBasketData,  setFunderBasketData]  = useState({ results: null, yearFrom: 2020, yearTo: 2025 });
+
+  // Check auth on mount
+  useEffect(() => {
+    fetch('/auth/me')
+      .then(r => r.json())
+      .then(d => setAuthState(d.authenticated ? d : false))
+      .catch(() => setAuthState(false));
+  }, []);
 
   const addInst    = r => setInstBasket(p => p.find(b=>b.institution_id===r.institution_id) ? p : [...p,{institution_id:r.institution_id,name:r.name,country:r.country,type:r.type}]);
   const removeInst = id => { setInstBasket(p => p.filter(b=>b.institution_id!==id)); setInstBasketData({ results: null, yearFrom: 2020, yearTo: 2025 }); };
@@ -27,6 +35,21 @@ export default function App() {
     </a>
   );
 
+  // Loading
+  if (authState === null) {
+    return (
+      <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0f1117',color:'#475569'}}>
+        Loading…
+      </div>
+    );
+  }
+
+  // Not logged in
+  if (authState === false) {
+    return <LoginGate />;
+  }
+
+  // Logged in
   return (
     <>
       <nav>
@@ -36,6 +59,10 @@ export default function App() {
         {navItem('funders','Funders',0)}
         {navItem('inst-basket','Inst. Basket',instBasket.length)}
         {navItem('funder-basket','Funder Basket',funderBasket.length)}
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'1rem'}}>
+          <span style={{fontSize:'.75rem',color:'#475569'}}>{authState.project_id}</span>
+          <a href="/auth/logout" style={{fontSize:'.8rem',color:'#64748b',textDecoration:'none'}}>Sign out</a>
+        </div>
       </nav>
       {page==='overview'      && <Overview setPage={setPage}/>}
       {page==='institutions'  && <Institutions instData={instData} setInstData={setInstData} basket={instBasket} addToBasket={addInst}/>}

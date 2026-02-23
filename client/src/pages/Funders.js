@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import useTable from './useTable';
+import { apiFetch } from '../api';
 
 const FIELDS = [{value:'name',label:'Name'},{value:'country',label:'Country (ISO)'},{value:'description',label:'Description'}];
 
@@ -21,9 +22,9 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
     const url = sq.trim()
       ? `/api/funders/search?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=1000`
       : `/api/funders/top?year_from=${yf}&year_to=${yt}&limit=1000`;
-    fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(d=>{ setFunderData({rows:d,yearFrom:yf,yearTo:yt}); setLoading(false); })
-      .catch(()=>{ setFunderData({rows:[],yearFrom:yf,yearTo:yt}); setLoading(false); });
+    apiFetch(url)
+      .then(d => { if (d) { setFunderData({rows:d,yearFrom:yf,yearTo:yt}); } setLoading(false); })
+      .catch(() => { setFunderData({rows:[],yearFrom:yf,yearTo:yt}); setLoading(false); });
   };
 
   const apply = () => fetchData(yearFrom, yearTo, q, field);
@@ -31,10 +32,9 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
   const pick = row => {
     if (sel?.funder_id===row.funder_id) { setSel(null);setTrends([]);return; }
     setSel(row); setTl(true);
-    fetch(`/api/funders/${row.funder_id}/trends`)
-      .then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(d=>{ setTrends(d); setTl(false); })
-      .catch(()=>setTl(false));
+    apiFetch(`/api/funders/${row.funder_id}/trends`)
+      .then(d => { if (d) setTrends(d); setTl(false); })
+      .catch(() => setTl(false));
   };
 
   const inBasket = id => basket.some(b=>b.funder_id===id);
