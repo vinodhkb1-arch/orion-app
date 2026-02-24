@@ -145,22 +145,21 @@ def cached(data, max_age: str = CACHE_1H):
 
 @app.get("/auth/login")
 def auth_login(project_id: str = Query(...)):
-    flow = make_flow()
-    auth_url, state = flow.authorization_url(
+    # Encode project_id into the state parameter so no extra cookie is needed.
+    # state = base64(project_id) + "." + hmac_signature
+    state_payload = encode_session({"project_id": project_id})
+    flow = make_flow(state=state_payload)
+    auth_url, _ = flow.authorization_url(
         access_type="online",
         include_granted_scopes="true",
     )
-    pre = encode_session({"oauth_state": state, "project_id": project_id})
-    response = RedirectResponse(auth_url)
-    response.set_cookie("orion_pre", pre, httponly=True, secure=True, samesite="lax", max_age=300)
-    return response
+    return RedirectResponse(auth_url)
 
 @app.get("/auth/callback")
 def auth_callback(request: Request, code: str = Query(...), state: str = Query(...)):
-    pre_raw = request.cookies.get("orion_pre")
-    pre = decode_session(pre_raw) if pre_raw else {}
-
-    if not pre or pre.get("oauth_state") != state:
+    # Decode and verify project_id from state
+    payload = decode_session(state)
+    if not payload or "project_id" not in payload:
         raise HTTPException(status_code=400, detail="OAuth state mismatch")
 
     flow = make_flow(state=state)
@@ -176,11 +175,10 @@ def auth_callback(request: Request, code: str = Query(...), state: str = Query(.
     session = {
         "email":      user.get("email", ""),
         "name":       user.get("name", ""),
-        "project_id": pre["project_id"],
+        "project_id": payload["project_id"],
     }
 
     response = RedirectResponse("/")
-    response.delete_cookie("orion_pre")
     set_session(response, session)
     return response
 
