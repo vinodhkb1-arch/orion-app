@@ -54,7 +54,7 @@ def decode_session(cookie: str) -> dict | None:
         body, sig = cookie.rsplit(".", 1)
         if not hmac.compare_digest(sig, _sign(body)):
             return None
-        return json.loads(base64.urlsafe_b64decode(body).encode())
+        return json.loads(base64.urlsafe_b64decode(body).decode())
     except Exception:
         return None
 
@@ -160,17 +160,24 @@ def auth_callback(request: Request, code: str = Query(...), state: str = Query(.
     # Decode and verify project_id from state
     payload = decode_session(state)
     if not payload or "project_id" not in payload:
-        raise HTTPException(status_code=400, detail="OAuth state mismatch")
+        return RedirectResponse("/?error=oauth_failed")
 
     flow = make_flow(state=state)
-    flow.fetch_token(code=code)
+    try:
+        flow.fetch_token(code=code)
+    except Exception:
+        return RedirectResponse("/?error=token_exchange_failed")
 
     import httpx
-    resp = httpx.get(
-        "https://www.googleapis.com/oauth2/v2/userinfo",
-        headers={"Authorization": f"Bearer {flow.credentials.token}"},
-    )
-    user = resp.json()
+    try:
+        resp = httpx.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {flow.credentials.token}"},
+        )
+        resp.raise_for_status()
+        user = resp.json()
+    except Exception:
+        return RedirectResponse("/?error=userinfo_failed")
 
     session = {
         "email":      user.get("email", ""),
