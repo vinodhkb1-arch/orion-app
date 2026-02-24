@@ -7,7 +7,7 @@ import FunderBasket from './pages/FunderBasket';
 import LoginGate from './pages/LoginGate';
 
 export default function App() {
-  const [authState, setAuthState]   = useState(null); // null=loading, false=logged out, object=logged in
+  const [authState, setAuthState]   = useState(null);
   const [page, setPage]             = useState('overview');
   const [instBasket,   setInstBasket]   = useState([]);
   const [funderBasket, setFunderBasket] = useState([]);
@@ -42,9 +42,7 @@ export default function App() {
     );
   }
 
-  if (authState === false) {
-    return <LoginGate />;
-  }
+  if (authState === false) return <LoginGate />;
 
   return (
     <>
@@ -56,15 +54,20 @@ export default function App() {
         {navItem('inst-basket', 'Inst. Basket', instBasket.length)}
         {navItem('funder-basket', 'Funder Basket', funderBasket.length)}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ fontSize: '.75rem', color: '#475569' }}>{authState.name || authState.email}</span>
+          <span style={{ fontSize: '.75rem', color: '#475569' }} title={authState.email}>
+            {authState.name || authState.email}
+          </span>
+          <span style={{ fontSize: '.7rem', color: '#334155' }}>
+            billing: <code style={{ color: '#475569' }}>{authState.project_id}</code>
+          </span>
           <a href="/auth/logout" style={{ fontSize: '.8rem', color: '#64748b', textDecoration: 'none' }}>Sign out</a>
         </div>
       </nav>
-      {page === 'overview'       && <Overview setPage={setPage} />}
-      {page === 'institutions'   && <Institutions instData={instData} setInstData={setInstData} basket={instBasket} addToBasket={addInst} />}
-      {page === 'funders'        && <Funders funderData={funderData} setFunderData={setFunderData} basket={funderBasket} addToBasket={addFunder} />}
-      {page === 'inst-basket'    && <InstBasket basket={instBasket} removeFromBasket={removeInst} basketData={instBasketData} setBasketData={setInstBasketData} />}
-      {page === 'funder-basket'  && <FunderBasket basket={funderBasket} removeFromBasket={removeFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} />}
+      {page === 'overview'      && <Overview setPage={setPage} />}
+      {page === 'institutions'  && <Institutions instData={instData} setInstData={setInstData} basket={instBasket} addToBasket={addInst} />}
+      {page === 'funders'       && <Funders funderData={funderData} setFunderData={setFunderData} basket={funderBasket} addToBasket={addFunder} />}
+      {page === 'inst-basket'   && <InstBasket basket={instBasket} removeFromBasket={removeInst} basketData={instBasketData} setBasketData={setInstBasketData} />}
+      {page === 'funder-basket' && <FunderBasket basket={funderBasket} removeFromBasket={removeFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} />}
     </>
   );
 }

@@ -2,65 +2,63 @@
 
 ## Architecture
 
-- Users sign in with Google (identity only — no BigQuery scope needed from them)
-- Queries run via the Cloud Run **service account** (your credentials)
-- All BigQuery costs are billed to **BILLING_PROJECT_ID** — a dedicated project
-  you create just to absorb query costs, separate from where your data lives
+- Users enter their GCP Project ID + sign in with Google
+- Your Cloud Run service account reads the (public) datasets
+- BigQuery jobs are submitted under the user's project ID → they get billed
+- You pay nothing for queries
 
 ---
 
-## Step 1 — Create a dedicated billing project
+## Step 1 — Make your datasets public
 
-This project's sole purpose is to be billed for BigQuery queries.
-Your data stays in `dashboard-488117` and `cwts-leiden` — this is just for billing.
+Run once in Cloud Shell:
 
 ```bash
-gcloud projects create orion-query-billing --name="ORION Query Billing"
-gcloud billing accounts list   # find your billing account ID
-gcloud billing projects link orion-query-billing \
-  --billing-account=XXXXXX-XXXXXX-XXXXXX
-gcloud services enable bigquery.googleapis.com \
-  --project=orion-query-billing
+bq add-iam-policy-binding \
+  --member=allUsers \
+  --role=roles/bigquery.dataViewer \
+  dashboard-488117:orion_cache
+
+# If you control cwts-leiden, do the same there.
+# If not, ask the dataset owner to make it public.
 ```
 
-Then grant the Cloud Run service account permission to run jobs in this project:
-```bash
-# Find your Cloud Run service account
-gcloud run services describe orion-app \
-  --region europe-west1 \
-  --format='value(spec.template.spec.serviceAccountName)'
+---
 
-# Grant it bigquery.jobUser on the billing project
-gcloud projects add-iam-policy-binding orion-query-billing \
-  --member=serviceAccount:YOUR-SERVICE-ACCOUNT@developer.gserviceaccount.com \
+## Step 2 — Grant your Cloud Run service account bigquery.jobUser on itself
+
+The service account needs permission to create jobs in the user's project.
+Wait — it can't. The user's project grants this automatically to any
+authenticated Google identity running jobs there. Since the service account
+is a valid Google identity, it can submit jobs to any project where it has
+`bigquery.jobUser`. The user needs to grant this once:
+
+```bash
+# User runs this in their own Cloud Shell, replacing values:
+gcloud projects add-iam-policy-binding MY-PROJECT-ID \
+  --member=serviceAccount:YOUR-CLOUD-RUN-SA@dashboard-488117.iam.gserviceaccount.com \
   --role=roles/bigquery.jobUser
 ```
 
-Set `BILLING_PROJECT_ID=orion-query-billing` in your env vars.
+Show this command to users on a "setup" page after they log in.
+Find your Cloud Run service account with:
+```bash
+gcloud run services describe orion-app \
+  --region europe-west1 \
+  --format='value(spec.template.spec.serviceAccountName)'
+```
 
 ---
 
-## Step 2 — Create OAuth 2.0 credentials
+## Step 3 — Create OAuth credentials
 
-1. Go to https://console.cloud.google.com/apis/credentials (in `dashboard-488117`)
-2. Click **Create Credentials → OAuth client ID**
-3. Application type: **Web application**, Name: `ORION Dashboard`
-4. Authorized redirect URIs:
-   ```
-   https://YOUR-APP-URL.run.app/auth/callback
-   http://localhost:8000/auth/callback   (for local dev)
-   ```
-5. Copy the **Client ID** and **Client Secret**
+1. Go to https://console.cloud.google.com/apis/credentials
+2. Create Credentials → OAuth client ID → Web application
+3. Authorized redirect URIs: https://YOUR-APP.run.app/auth/callback
+4. Copy Client ID and Client Secret
 
----
-
-## Step 3 — Configure the OAuth consent screen
-
-1. Go to https://console.cloud.google.com/apis/credentials/consent
-2. User Type: **External** (or Internal for a Workspace org)
-3. App name: `ORION`, fill in support/developer email
-4. Scopes: add `openid`, `email`, `profile` (no BigQuery scope needed)
-5. Add test users while in development; publish when ready for everyone
+Configure consent screen at /apis/credentials/consent:
+- Scopes: openid, email, profile (no BigQuery scope needed)
 
 ---
 
@@ -72,38 +70,15 @@ gcloud run services update orion-app \
   --set-env-vars \
     OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com",\
     OAUTH_CLIENT_SECRET="your-client-secret",\
-    OAUTH_REDIRECT_URI="https://YOUR-APP-URL.run.app/auth/callback",\
-    BILLING_PROJECT_ID="orion-query-billing",\
+    OAUTH_REDIRECT_URI="https://YOUR-APP.run.app/auth/callback",\
     SESSION_SECRET="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
 ```
 
 ---
 
-## Step 5 — Grant the service account access to your datasets
+## What users need to do (one time)
 
-The Cloud Run service account needs to read your data:
-
-```bash
-SA=YOUR-SERVICE-ACCOUNT@developer.gserviceaccount.com
-
-bq add-iam-policy-binding \
-  --member=serviceAccount:$SA \
-  --role=roles/bigquery.dataViewer \
-  dashboard-488117:orion_cache
-```
-
-Repeat for `cwts-leiden:openalex_2025aug` if you control that project,
-or ask the project owner to grant your service account dataViewer there.
-
----
-
-## Local development
-
-```bash
-cp .env.example .env   # fill in your values
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-
-Use `http://localhost:8000/auth/callback` as the redirect URI in both
-`.env` and the Google Console.
+1. Create a GCP project at https://console.cloud.google.com/projectcreate
+2. Enable billing (free tier: 1 TB/month — most users never pay)
+3. Run the `gcloud projects add-iam-policy-binding` command above
+4. Come back to ORION, enter their Project ID, sign in
