@@ -2,20 +2,52 @@
 set -e
 
 # ── ORION Dashboard — Deploy ──────────────────────────────────────────────────
-# Run from Cloud Shell inside the orion-app directory:
-#   git pull && bash DEPLOY.sh
+# Usage:
+#   bash DEPLOY.sh            → deploy to PRODUCTION (orion-app)
+#   bash DEPLOY.sh --dev      → deploy to DEV (orion-app-dev)
+#
+# Run from Cloud Shell inside the orion-app directory after pulling changes:
+#   git pull && bash DEPLOY.sh [--dev]
 # ──────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ID="dashboard-488117"
 REGION="europe-west1"
 
+# ── Parse flags ───────────────────────────────────────────────────────────────
+ENV="prod"
+for arg in "$@"; do
+  case $arg in
+    --dev) ENV="dev" ;;
+    *) echo "Unknown argument: $arg"; exit 1 ;;
+  esac
+done
+
+# ── Resolve service name and build config per environment ─────────────────────
+if [ "$ENV" = "dev" ]; then
+  SERVICE_NAME="orion-app-dev"
+  BUILD_CONFIG="cloudbuild.dev.yaml"
+  echo "🔧 Deploying to DEV environment ($SERVICE_NAME)"
+else
+  SERVICE_NAME="orion-app"
+  BUILD_CONFIG="cloudbuild.yaml"
+  echo "🚀 Deploying to PRODUCTION environment ($SERVICE_NAME)"
+  echo ""
+  read -p "Are you sure you want to deploy to production? [y/N] " confirm
+  if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+    echo "Aborted."
+    exit 0
+  fi
+fi
+
+# ── Deploy ────────────────────────────────────────────────────────────────────
 gcloud config set project $PROJECT_ID
 
-echo "=== Building and deploying from current directory ==="
+echo ""
+echo "=== Building and deploying from current branch: $(git branch --show-current) ==="
 gcloud builds submit . \
-  --config=cloudbuild.yaml \
+  --config=$BUILD_CONFIG \
   --project=$PROJECT_ID
 
 echo ""
-echo "🚀 Deployed URL:"
-gcloud run services describe orion-app --region $REGION --format 'value(status.url)'
+echo "✅ Done! Deployed URL:"
+gcloud run services describe $SERVICE_NAME --region $REGION --format 'value(status.url)'
