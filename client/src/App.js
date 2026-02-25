@@ -5,6 +5,7 @@ import Funders from './pages/Funders';
 import InstBasket from './pages/InstBasket';
 import FunderBasket from './pages/FunderBasket';
 import LoginGate from './pages/LoginGate';
+import ErrorPage from './pages/ErrorPage';
 
 export default function App() {
   const [authState, setAuthState]   = useState(null);
@@ -41,6 +42,9 @@ export default function App() {
       </div>
     );
   }
+
+  const errorCode = new URLSearchParams(window.location.search).get('error');
+  if (errorCode) return <ErrorPage code={errorCode} />;
 
   if (authState === false) return <LoginGate />;
 

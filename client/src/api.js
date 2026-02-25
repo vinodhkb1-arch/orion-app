@@ -5,7 +5,7 @@
 export async function apiFetch(url, options = {}) {
   const res = await fetch(url, options);
   if (res.status === 401) {
-    window.location.href = '/';   // LoginGate will be shown by App.js /auth/me check
+    window.location.href = '/?error=session_expired';
     return null;
   }
   if (!res.ok) throw new Error(res.status);
