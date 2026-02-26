@@ -28,7 +28,24 @@ export async function apiFetch(url, options = {}) {
 }
 
 /**
- * Download an array of objects as a CSV file.
+ * Build a VOSviewer co-occurrence network for a basket and open it in
+ * VOSviewer Online. Makes a POST to the given buildUrl, gets back a token,
+ * then opens https://app.vosviewer.com/?json=<our-token-endpoint>.
+ *
+ * @param {string} buildUrl  - e.g. '/api/vos/build/institutions'
+ * @param {object} body      - JSON body with ids, year_from, year_to, limit
+ * @returns {Promise<void>}  - rejects with Error on failure
+ */
+export async function openVosViewer(buildUrl, body) {
+  const res = await apiFetch(buildUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res) return; // 401 redirect already handled
+  const tokenUrl = `${window.location.origin}/api/vos/${res.token}`;
+  window.open(`https://app.vosviewer.com/?json=${encodeURIComponent(tokenUrl)}`, '_blank');
+}
  * @param {object[]} rows     - array of plain objects
  * @param {string}   filename - e.g. "institutions.csv"
  */

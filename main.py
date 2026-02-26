@@ -254,7 +254,7 @@ def institutions_search(
 ):
     session = require_auth(request)
     if not q.strip():
-        return cached({"rows": [], "bytes_processed": 0})
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
     field_map = {"name": "i.institution", "country": "i.country_iso_alpha2_code", "type": "it.institution_type"}
     col = field_map.get(field, "i.institution")
     sql = f"""
@@ -329,7 +329,7 @@ def funders_search(
 ):
     session = require_auth(request)
     if not q.strip():
-        return cached({"rows": [], "bytes_processed": 0})
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
     field_map = {"name": "f.funder", "country": "f.country_iso_alpha2_code", "description": "f.description"}
     col = field_map.get(field, "f.funder")
     sql = f"""
@@ -511,6 +511,231 @@ def basket_funder_co_funders(req: FunderBasketRequest, request: Request):
         ORDER BY works_count DESC LIMIT @limit
     """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
     return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+
+# ── VOSviewer network export ──────────────────────────────────────────────────
+# Networks are expensive to recompute and need to be accessible by VOSviewer
+# Online (an external service) without auth cookies. We generate the network
+# once on demand, store it in memory under a short-lived one-time token, and
+# expose it via a public /api/vos/<token> endpoint that VOSviewer can fetch.
+
+import secrets
+import threading
+
+_vos_store: dict[str, dict] = {}
+_vos_lock = threading.Lock()
+
+def _store_vos(data: dict) -> str:
+    """Store network data and return a one-time token (valid 10 min)."""
+    token = secrets.token_urlsafe(24)
+    with _vos_lock:
+        _vos_store[token] = {"data": data, "expires": time.time() + 600}
+        # Prune expired tokens while we have the lock
+        expired = [k for k, v in _vos_store.items() if v["expires"] < time.time()]
+        for k in expired:
+            del _vos_store[k]
+    return token
+
+@app.get("/api/vos/{token}")
+def vos_serve(token: str):
+    """Serve a pre-built VOSviewer JSON to VOSviewer Online (no auth required)."""
+    with _vos_lock:
+        entry = _vos_store.pop(token, None)
+    if not entry or entry["expires"] < time.time():
+        raise HTTPException(status_code=404, detail="Token not found or expired")
+    return JSONResponse(
+        content=entry["data"],
+        headers={
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "https://app.vosviewer.com",
+        },
+    )
+
+class VosInstRequest(BaseModel):
+    institution_ids: List[int]
+    year_from: int = 2000
+    year_to: int = 2025
+    limit: int = 200
+
+@app.post("/api/vos/build/institutions")
+def vos_build_institutions(req: VosInstRequest, request: Request):
+    """Build a VOSviewer co-occurrence network for a basket of institutions.
+
+    Returns a token URL pointing to a pre-built VOSviewer JSON file.
+    Nodes = institutions that co-occur with basket institutions.
+    Edges = number of shared works between each pair of institutions.
+    Node weight = total works in the year range.
+    """
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.institution_ids:
+        raise HTTPException(status_code=400, detail="No institution IDs provided")
+
+    ids = req.institution_ids
+    yf, yt, lim = req.year_from, req.year_to, req.limit
+
+    # Step 1: Get all institutions that appear on works involving the basket,
+    #         including the basket institutions themselves.
+    node_rows, _ = run_query(f"""
+        SELECT i.institution_id AS id, i.institution AS label,
+               i.country_iso_alpha2_code AS country,
+               COUNT(DISTINCT wai.work_id) AS works_count
+        FROM `{SOURCE}.work_affiliation_institution` wai
+        JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
+        JOIN `{SOURCE}.institution` i ON wai.institution_id = i.institution_id
+        WHERE w.work_id IN (
+            SELECT DISTINCT work_id
+            FROM `{SOURCE}.work_affiliation_institution`
+            WHERE institution_id IN UNNEST(@ids)
+        )
+          AND w.pub_year BETWEEN @year_from AND @year_to
+        GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code
+        ORDER BY works_count DESC
+        LIMIT @limit
+    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
+
+    # Step 2: Get co-occurrence edge weights between all pairs in the node set.
+    node_ids = [r["id"] for r in node_rows]
+    if len(node_ids) < 2:
+        raise HTTPException(status_code=400, detail="Not enough co-occurring institutions to build a network")
+
+    edge_rows, _ = run_query(f"""
+        SELECT wai1.institution_id AS source_id,
+               wai2.institution_id AS target_id,
+               COUNT(DISTINCT wai1.work_id) AS strength
+        FROM `{SOURCE}.work_affiliation_institution` wai1
+        JOIN `{SOURCE}.work_affiliation_institution` wai2
+            ON wai1.work_id = wai2.work_id
+           AND wai1.institution_id < wai2.institution_id
+        JOIN `{SOURCE}.work` w ON wai1.work_id = w.work_id
+        WHERE wai1.institution_id IN UNNEST(@node_ids)
+          AND wai2.institution_id IN UNNEST(@node_ids)
+          AND w.pub_year BETWEEN @year_from AND @year_to
+        GROUP BY source_id, target_id
+        HAVING strength > 0
+    """, {"node_ids": node_ids, "year_from": yf, "year_to": yt}, pid)
+
+    # Build VOSviewer JSON
+    basket_set = set(ids)
+    items = [
+        {
+            "id": r["id"],
+            "label": r["label"],
+            "description": r.get("country") or "",
+            "weights": {"Works": r["works_count"]},
+            **({"cluster": 1} if r["id"] in basket_set else {"cluster": 2}),
+        }
+        for r in node_rows
+    ]
+    links = [
+        {"source_id": r["source_id"], "target_id": r["target_id"], "strength": r["strength"]}
+        for r in edge_rows
+    ]
+    vos_json = {
+        "network": {"items": items, "links": links},
+        "config": {
+            "terminology": {"item": "institution", "items": "institutions", "link_strength": "co-occurring works"},
+            "parameters": {"item_size": 1, "largest_component": True},
+        },
+        "info": {
+            "title": f"Institution co-occurrence network ({yf}–{yt})",
+            "description": f"Nodes: institutions sharing works with your basket. Edge strength: number of shared works. Basket institutions shown in cluster 1.",
+        },
+    }
+    token = _store_vos(vos_json)
+    return JSONResponse({"token": token})
+
+
+class VosFunderRequest(BaseModel):
+    funder_ids: List[int]
+    year_from: int = 2000
+    year_to: int = 2025
+    limit: int = 200
+
+@app.post("/api/vos/build/funders")
+def vos_build_funders(req: VosFunderRequest, request: Request):
+    """Build a VOSviewer co-occurrence network for a basket of funders.
+
+    Returns a token URL pointing to a pre-built VOSviewer JSON file.
+    Nodes = funders that co-funded works involving the basket funders.
+    Edges = number of shared funded works between each pair of funders.
+    Node weight = total funded works in the year range.
+    """
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.funder_ids:
+        raise HTTPException(status_code=400, detail="No funder IDs provided")
+
+    ids = req.funder_ids
+    yf, yt, lim = req.year_from, req.year_to, req.limit
+
+    # Step 1: Get all funders that appear on works funded by the basket.
+    node_rows, _ = run_query(f"""
+        SELECT f.funder_id AS id, f.funder AS label,
+               f.country_iso_alpha2_code AS country,
+               COUNT(DISTINCT wg.work_id) AS works_count
+        FROM `{SOURCE}.work_grant` wg
+        JOIN `{SOURCE}.work` w ON wg.work_id = w.work_id
+        JOIN `{SOURCE}.funder` f ON wg.funder_id = f.funder_id
+        WHERE w.work_id IN (
+            SELECT DISTINCT work_id FROM `{SOURCE}.work_grant`
+            WHERE funder_id IN UNNEST(@ids)
+        )
+          AND w.pub_year BETWEEN @year_from AND @year_to
+        GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code
+        ORDER BY works_count DESC
+        LIMIT @limit
+    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
+
+    node_ids = [r["id"] for r in node_rows]
+    if len(node_ids) < 2:
+        raise HTTPException(status_code=400, detail="Not enough co-occurring funders to build a network")
+
+    # Step 2: Get co-occurrence edge weights between all pairs in the node set.
+    edge_rows, _ = run_query(f"""
+        SELECT wg1.funder_id AS source_id,
+               wg2.funder_id AS target_id,
+               COUNT(DISTINCT wg1.work_id) AS strength
+        FROM `{SOURCE}.work_grant` wg1
+        JOIN `{SOURCE}.work_grant` wg2
+            ON wg1.work_id = wg2.work_id
+           AND wg1.funder_id < wg2.funder_id
+        JOIN `{SOURCE}.work` w ON wg1.work_id = w.work_id
+        WHERE wg1.funder_id IN UNNEST(@node_ids)
+          AND wg2.funder_id IN UNNEST(@node_ids)
+          AND w.pub_year BETWEEN @year_from AND @year_to
+        GROUP BY source_id, target_id
+        HAVING strength > 0
+    """, {"node_ids": node_ids, "year_from": yf, "year_to": yt}, pid)
+
+    basket_set = set(ids)
+    items = [
+        {
+            "id": r["id"],
+            "label": r["label"],
+            "description": r.get("country") or "",
+            "weights": {"Works": r["works_count"]},
+            **({"cluster": 1} if r["id"] in basket_set else {"cluster": 2}),
+        }
+        for r in node_rows
+    ]
+    links = [
+        {"source_id": r["source_id"], "target_id": r["target_id"], "strength": r["strength"]}
+        for r in edge_rows
+    ]
+    vos_json = {
+        "network": {"items": items, "links": links},
+        "config": {
+            "terminology": {"item": "funder", "items": "funders", "link_strength": "co-funded works"},
+            "parameters": {"item_size": 1, "largest_component": True},
+        },
+        "info": {
+            "title": f"Funder co-occurrence network ({yf}–{yt})",
+            "description": f"Nodes: funders co-funding works with your basket funders. Edge strength: number of co-funded works. Basket funders shown in cluster 1.",
+        },
+    }
+    token = _store_vos(vos_json)
+    return JSONResponse({"token": token})
+
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 

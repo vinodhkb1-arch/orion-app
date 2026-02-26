@@ -10,7 +10,7 @@
  *   emptyHint     Message shown when basket is empty
  */
 import React, { useState } from 'react';
-import { apiFetch } from '../api';
+import { apiFetch, openVosViewer } from '../api';
 import { BytesTag } from '../bytesInfo';
 import { QueryModal, ResultTable } from './BasketShared';
 
@@ -36,6 +36,8 @@ export default function BasketPage({
   const [worksLoading,  setWorksLoading]  = useState(false);
   const [coInstLoading, setCoInstLoading] = useState(false);
   const [coFundLoading, setCoFundLoading] = useState(false);
+  const [vosLoading,    setVosLoading]    = useState(false);
+  const [vosError,      setVosError]      = useState('');
 
   const [worksQuery,  setWorksQuery]  = useState(false);
   const [coInstQuery, setCoInstQuery] = useState(false);
@@ -94,6 +96,16 @@ export default function BasketPage({
       .finally(() => setCoFundLoading(false));
   };
 
+  const openVos = () => {
+    const yf = yearFrom, yt = yearTo;
+    const idField = type === 'institutions' ? 'institution_ids' : 'funder_ids';
+    const buildUrl = `/api/vos/build/${type}`;
+    setVosLoading(true); setVosError('');
+    openVosViewer(buildUrl, { [idField]: ids, year_from: yf, year_to: yt, limit: 200 })
+      .catch(e => setVosError(e.message))
+      .finally(() => setVosLoading(false));
+  };
+
   // Read back the year range that was actually used for each result.
   const wYF = basketData.worksYF  ?? yearFrom;
   const wYT = basketData.worksYT  ?? yearTo;
@@ -142,10 +154,28 @@ export default function BasketPage({
           </div>
 
           {/* Action buttons */}
-          <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             {actionBtn('Get all works',                getWorks,  worksLoading)}
             {actionBtn('Get co-occurring institutions', getCoInst, coInstLoading)}
             {actionBtn('Get co-occurring funders',      getCoFund, coFundLoading)}
+          </div>
+
+          {/* VOSviewer network button */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <button
+              className="btn"
+              onClick={openVos}
+              disabled={vosLoading}
+              style={{ background: '#1a5276', borderColor: '#2980b9', opacity: vosLoading ? .6 : 1 }}
+            >
+              {vosLoading ? 'Building network…' : '🔵 Open co-occurrence network in VOSviewer'}
+            </button>
+            {vosError && (
+              <span style={{ marginLeft: '1rem', fontSize: '.8rem', color: '#f87171' }}>{vosError}</span>
+            )}
+            <div style={{ fontSize: '.72rem', color: '#334155', marginTop: '.35rem' }}>
+              Opens a co-occurrence network of {type} in VOSviewer Online. Uses year range above. Top 200 nodes by works count.
+            </div>
           </div>
 
           {error && <div className="status" style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
