@@ -15,8 +15,9 @@ export function formatBytes(bytes) {
  */
 export function BytesTag({ bytes }) {
   if (bytes == null) return null;
+  const label = bytes === 0 ? '⚡ cached' : `⚡ ${formatBytes(bytes)} scanned`;
   return (
-    <span title="BigQuery data scanned for this request" style={{
+    <span title={bytes === 0 ? 'Result served from cache (no data scanned)' : 'BigQuery data scanned for this request'} style={{
       fontSize: '.7rem',
       color: '#475569',
       background: '#1a1d27',
@@ -26,7 +27,7 @@ export function BytesTag({ bytes }) {
       fontFamily: 'monospace',
       whiteSpace: 'nowrap',
     }}>
-      ⚡ {formatBytes(bytes)} scanned
+      {label}
     </span>
   );
 }

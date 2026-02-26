@@ -1,0 +1,143 @@
+/**
+ * EntityList — shared list/search page used by both Institutions and Funders.
+ *
+ * Config props:
+ *   entityData / setEntityData  — App-level state for this entity
+ *   basket / addToBasket        — basket state
+ *   apiTop                      — URL prefix for top results (e.g. '/api/institutions/top')
+ *   apiSearch                   — URL prefix for search (e.g. '/api/institutions/search')
+ *   idKey                       — primary key field name (e.g. 'institution_id')
+ *   fields                      — array of { value, label } for the search-by dropdown
+ *   title                       — page heading
+ *   csvName                     — filename for CSV export
+ *   renderRow                   — fn(row, inBasket, addToBasket) → <tr> contents (tds only, no <tr> wrapper)
+ *   renderHeaders               — fn(SortTh) → header <th> elements
+ */
+import React, { useState } from 'react';
+import useTable from './useTable';
+import { apiFetch, exportCsv } from '../api';
+import { BytesTag } from '../bytesInfo';
+
+export default function EntityList({
+  entityData,
+  setEntityData,
+  basket,
+  addToBasket,
+  apiTop,
+  apiSearch,
+  idKey,
+  fields,
+  title,
+  csvName,
+  renderHeaders,
+  renderRow,
+}) {
+  const { rows, yearFrom: fetchedYF, yearTo: fetchedYT, bytesProcessed } = entityData;
+  const [loading, setLoading] = useState(false);
+  const [q,       setQ]       = useState('');
+  const [field,   setField]   = useState(fields[0].value);
+  const [yearFrom, setYF]     = useState(fetchedYF);
+  const [yearTo,   setYT]     = useState(fetchedYT);
+
+  const { visibleRows, onSort, sortIcon, sortKey } = useTable(rows, 1000);
+
+  const fetchData = (yf, yt, sq, sf) => {
+    setLoading(true);
+    const url = sq.trim()
+      ? `${apiSearch}?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=1000`
+      : `${apiTop}?year_from=${yf}&year_to=${yt}&limit=1000`;
+    apiFetch(url)
+      .then(d => {
+        setEntityData({ rows: d?.rows ?? [], yearFrom: yf, yearTo: yt, bytesProcessed: d?.bytes_processed ?? null });
+      })
+      .catch(() => {
+        setEntityData({ rows: [], yearFrom: yf, yearTo: yt, bytesProcessed: null });
+      })
+      .finally(() => setLoading(false));
+  };
+
+  const apply = () => fetchData(yearFrom, yearTo, q, field);
+
+  const inBasket = id => basket.some(b => b[idKey] === id);
+
+  const SortTh = ({ k, children }) => (
+    <th onClick={() => onSort(k)} className={sortKey === k ? 'sorted' : ''}>{children}{sortIcon(k)}</th>
+  );
+
+  return (
+    <div className="page">
+      <h1>{title}</h1>
+      <div className="controls">
+        <div className="field-group">
+          <label>Search by</label>
+          <select value={field} onChange={e => setField(e.target.value)}>
+            {fields.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </select>
+        </div>
+        <input
+          type="text"
+          placeholder={`Search by ${fields.find(f => f.value === field)?.label}…`}
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && apply()}
+        />
+        <div className="divider" />
+        <div className="field-group">
+          <label>Years</label>
+          <input type="number" value={yearFrom} onChange={e => setYF(Number(e.target.value))} />
+          <label>–</label>
+          <input type="number" value={yearTo}   onChange={e => setYT(Number(e.target.value))} />
+        </div>
+        <button className="btn" onClick={apply}>Search</button>
+        {rows.length > 0 && (
+          <button className="btn ghost" onClick={() => exportCsv(rows, csvName)}>⬇ CSV</button>
+        )}
+      </div>
+
+      {bytesProcessed != null && (
+        <div style={{ marginBottom: '.75rem' }}>
+          <BytesTag bytes={bytesProcessed} />
+          {fetchedYF !== yearFrom || fetchedYT !== yearTo
+            ? <span style={{ fontSize: '.7rem', color: '#334155', marginLeft: '.5rem' }}>
+                (showing results for {fetchedYF}–{fetchedYT})
+              </span>
+            : null}
+        </div>
+      )}
+
+      {loading && <div className="status">Loading…</div>}
+      {!loading && rows.length === 0 && (
+        <div className="status">Use the controls above and click Search to load data.</div>
+      )}
+      {!loading && rows.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead><tr>
+              <th>#</th>
+              <th></th>
+              {renderHeaders(SortTh)}
+              <th></th>
+            </tr></thead>
+            <tbody>
+              {visibleRows.map((r, i) => (
+                <tr key={r[idKey]} className={inBasket(r[idKey]) ? 'in-basket' : ''}>
+                  <td className="rank">{i + 1}</td>
+                  <td>
+                    {r.thumbnail_url
+                      ? <img className="thumb" src={r.thumbnail_url} alt="" />
+                      : <div className="thumb" />}
+                  </td>
+                  {renderRow(r, inBasket(r[idKey]), addToBasket)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="tbl-footer">
+            <span>Showing {visibleRows.length} of {rows.length} results</span>
+            {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

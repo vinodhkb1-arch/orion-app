@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+
 /**
  * useTable — display limit + column sorting for a data list.
  *
@@ -7,10 +8,9 @@ import { useState, useMemo } from 'react';
  * change which rows are visible, only their order within the slice.
  * This is O(n log n) on at most a few hundred items — instantaneous.
  */
-export default function useTable(fullRows, defaultLimit = 50) {
-  const [displayLimit, setDisplayLimit] = useState(defaultLimit);
-  const [sortKey, setSortKey]           = useState(null);
-  const [sortDir, setSortDir]           = useState('desc');
+export default function useTable(fullRows, displayLimit = 50) {
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState('desc');
 
   const visibleRows = useMemo(() => {
     const slice = fullRows.slice(0, displayLimit);
@@ -25,15 +25,15 @@ export default function useTable(fullRows, defaultLimit = 50) {
   }, [fullRows, displayLimit, sortKey, sortDir]);
 
   const onSort = key => {
-    if (sortKey === key) setSortDir(d => d==='asc'?'desc':'asc');
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('desc'); }
   };
 
   const sortIcon = key => (
     <span className="sort-icon">
-      {sortKey !== key ? '⇅' : sortDir==='asc' ? '↑' : '↓'}
+      {sortKey !== key ? '⇅' : sortDir === 'asc' ? '↑' : '↓'}
     </span>
   );
 
-  return { visibleRows, displayLimit, setDisplayLimit, onSort, sortIcon, sortKey };
+  return { visibleRows, onSort, sortIcon, sortKey };
 }

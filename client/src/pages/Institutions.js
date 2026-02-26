@@ -1,103 +1,42 @@
-import React, { useState } from 'react';
-import useTable from './useTable';
-import { apiFetch, exportCsv } from '../api';
-import { BytesTag } from '../bytesInfo';
+import React from 'react';
+import EntityList from './EntityList';
 
-const FIELDS = [{value:'name',label:'Name'},{value:'country',label:'Country (ISO)'},{value:'type',label:'Type'}];
+const FIELDS = [
+  { value: 'name',    label: 'Name' },
+  { value: 'country', label: 'Country (ISO)' },
+  { value: 'type',    label: 'Type' },
+];
 
 export default function Institutions({ instData, setInstData, basket, addToBasket }) {
-  const { rows, yearFrom: fetchedYF, yearTo: fetchedYT, bytesProcessed } = instData;
-  const [loading, setLoading] = useState(false);
-  const [q, setQ]             = useState('');
-  const [field, setField]     = useState('name');
-  const [yearFrom, setYF]     = useState(fetchedYF);
-  const [yearTo, setYT]       = useState(fetchedYT);
-  const { visibleRows, onSort, sortIcon, sortKey } = useTable(rows, 1000);
-
-  const fetchData = (yf, yt, sq, sf) => {
-    setLoading(true);
-    const url = sq.trim()
-      ? `/api/institutions/search?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=1000`
-      : `/api/institutions/top?year_from=${yf}&year_to=${yt}&limit=1000`;
-    apiFetch(url)
-      .then(d => {
-        if (d) setInstData({ rows: d.rows, yearFrom: yf, yearTo: yt, bytesProcessed: d.bytes_processed });
-        setLoading(false);
-      })
-      .catch(() => { setInstData({ rows: [], yearFrom: yf, yearTo: yt, bytesProcessed: null }); setLoading(false); });
-  };
-
-  const apply = () => fetchData(yearFrom, yearTo, q, field);
-
-  const inBasket = id => basket.some(b => b.institution_id === id);
-
-  const SortTh = ({k, children}) => (
-    <th onClick={() => onSort(k)} className={sortKey === k ? 'sorted' : ''}>{children}{sortIcon(k)}</th>
-  );
-
   return (
-    <div className="page">
-      <h1>Institutions</h1>
-      <div className="controls">
-        <div className="field-group">
-          <label>Search by</label>
-          <select value={field} onChange={e => setField(e.target.value)}>
-            {FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-          </select>
-        </div>
-        <input type="text" placeholder={`Search by ${FIELDS.find(f => f.value === field)?.label}…`}
-          value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && apply()}/>
-        <div className="divider"/>
-        <div className="field-group">
-          <label>Years</label>
-          <input type="number" value={yearFrom} onChange={e => setYF(Number(e.target.value))}/>
-          <label>–</label>
-          <input type="number" value={yearTo} onChange={e => setYT(Number(e.target.value))}/>
-        </div>
-        <button className="btn" onClick={apply}>Search</button>
-        {rows.length > 0 && <button className="btn ghost" onClick={() => exportCsv(rows, 'institutions.csv')}>⬇ CSV</button>}
-        {rows.length > 0 && <BytesTag bytes={bytesProcessed} />}
-      </div>
-
-      {loading && <div className="status">Loading…</div>}
-      {!loading && rows.length === 0 && <div className="status">Use the controls above and click Search to load data.</div>}
-      {!loading && rows.length > 0 && (
-        <div className="table-wrap">
-          <table>
-            <thead><tr>
-              <th>#</th><th></th>
-              <SortTh k="name">Institution</SortTh>
-              <SortTh k="type">Type</SortTh>
-              <SortTh k="country">Country</SortTh>
-              <SortTh k="works_count">Works</SortTh>
-              <th></th>
-            </tr></thead>
-            <tbody>
-              {visibleRows.map((r, i) => (
-                <tr key={r.institution_id}
-                  className={inBasket(r.institution_id) ? 'in-basket' : ''}>
-                  <td className="rank">{i+1}</td>
-                  <td>{r.thumbnail_url ? <img className="thumb" src={r.thumbnail_url} alt=""/> : <div className="thumb"/>}</td>
-                  <td>{r.name}</td>
-                  <td>{r.type ? <span className="badge-type">{r.type}</span> : '—'}</td>
-                  <td>{r.country ? <span className="badge-country">{r.country}</span> : '—'}</td>
-                  <td className="works">{Number(r.works_count).toLocaleString()}</td>
-                  {/* <td className="frac">{Number(r.fractional_count).toLocaleString(undefined, {maximumFractionDigits:1})}</td> */}
-                  <td onClick={e => e.stopPropagation()}>
-                    {inBasket(r.institution_id)
-                      ? <span style={{color:'#4ade80',fontSize:'.8rem'}}>✓</span>
-                      : <button className="btn secondary" style={{padding:'.2rem .5rem',fontSize:'.75rem'}} onClick={() => addToBasket(r)}>+</button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="tbl-footer">
-            <span>Showing {visibleRows.length} of {rows.length} results</span>
-            {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
-          </div>
-        </div>
-      )}
-    </div>
+    <EntityList
+      entityData={instData}
+      setEntityData={setInstData}
+      basket={basket}
+      addToBasket={addToBasket}
+      apiTop="/api/institutions/top"
+      apiSearch="/api/institutions/search"
+      idKey="institution_id"
+      fields={FIELDS}
+      title="Institutions"
+      csvName="institutions.csv"
+      renderHeaders={SortTh => <>
+        <SortTh k="name">Institution</SortTh>
+        <SortTh k="type">Type</SortTh>
+        <SortTh k="country">Country</SortTh>
+        <SortTh k="works_count">Works</SortTh>
+      </>}
+      renderRow={(r, inBask, add) => <>
+        <td>{r.name}</td>
+        <td>{r.type    ? <span className="badge-type">{r.type}</span>       : '—'}</td>
+        <td>{r.country ? <span className="badge-country">{r.country}</span> : '—'}</td>
+        <td className="works">{Number(r.works_count).toLocaleString()}</td>
+        <td onClick={e => e.stopPropagation()}>
+          {inBask
+            ? <span style={{ color: '#4ade80', fontSize: '.8rem' }}>✓</span>
+            : <button className="btn secondary" style={{ padding: '.2rem .5rem', fontSize: '.75rem' }} onClick={() => add(r)}>+</button>}
+        </td>
+      </>}
+    />
   );
 }

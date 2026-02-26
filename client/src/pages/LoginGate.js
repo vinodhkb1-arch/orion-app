@@ -7,6 +7,11 @@ export default function LoginGate() {
   const handleLogin = () => {
     const pid = projectId.trim();
     if (!pid) { setError('Please enter your GCP Project ID.'); return; }
+    // GCP project IDs: 6–30 chars, lowercase letters/digits/hyphens, must start with a letter, no trailing hyphen
+    if (!/^[a-z][a-z0-9\-]{4,28}[a-z0-9]$/.test(pid)) {
+      setError('Invalid project ID. Must be 6–30 characters: lowercase letters, digits, and hyphens only, starting with a letter.');
+      return;
+    }
     window.location.href = `/auth/login?project_id=${encodeURIComponent(pid)}`;
   };
 

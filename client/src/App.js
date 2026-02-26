@@ -37,8 +37,8 @@ export default function App() {
 
   const [instData,         setInstData]         = useState({ rows: [], yearFrom: 2020, yearTo: 2025, bytesProcessed: null });
   const [funderData,       setFunderData]       = useState({ rows: [], yearFrom: 2020, yearTo: 2025, bytesProcessed: null });
-  const [instBasketData,   setInstBasketData]   = useState({ results: null, yearFrom: 2020, yearTo: 2025 });
-  const [funderBasketData, setFunderBasketData] = useState({ results: null, yearFrom: 2020, yearTo: 2025 });
+  const [instBasketData,   setInstBasketData]   = useState({ yearFrom: 2020, yearTo: 2025, worksResult: null, coInstResult: null, coFundResult: null });
+  const [funderBasketData, setFunderBasketData] = useState({ yearFrom: 2020, yearTo: 2025, worksResult: null, coInstResult: null, coFundResult: null });
 
   useEffect(() => {
     fetch('/auth/me')
@@ -48,9 +48,9 @@ export default function App() {
   }, []);
 
   const addInst      = r => setInstBasket(p => p.find(b => b.institution_id === r.institution_id) ? p : [...p, { institution_id: r.institution_id, name: r.name, country: r.country, type: r.type }]);
-  const removeInst   = id => { setInstBasket(p => p.filter(b => b.institution_id !== id)); setInstBasketData({ results: null, yearFrom: 2020, yearTo: 2025 }); };
+  const removeInst   = id => { setInstBasket(p => p.filter(b => b.institution_id !== id)); setInstBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null })); };
   const addFunder    = r => setFunderBasket(p => p.find(b => b.funder_id === r.funder_id) ? p : [...p, { funder_id: r.funder_id, name: r.name, country: r.country }]);
-  const removeFunder = id => { setFunderBasket(p => p.filter(b => b.funder_id !== id)); setFunderBasketData({ results: null, yearFrom: 2020, yearTo: 2025 }); };
+  const removeFunder = id => { setFunderBasket(p => p.filter(b => b.funder_id !== id)); setFunderBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null })); };
 
   const navItem = (key, label, count) => (
     <a key={key} href="#" className={page === key ? 'active' : ''} onClick={e => { e.preventDefault(); setPage(key); }}>

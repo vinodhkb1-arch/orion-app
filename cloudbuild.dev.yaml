@@ -8,6 +8,9 @@ steps:
       - '.'
 
   # Push to Container Registry
+  # Note: gcr.io (Container Registry) is deprecated; Google recommends migrating
+  # to Artifact Registry (e.g. europe-west1-docker.pkg.dev/$PROJECT_ID/orion/orion-app-dev).
+  # Functionality is unchanged for now — migrate when convenient.
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'

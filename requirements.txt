@@ -1,9 +1,12 @@
-fastapi==0.111.0
-uvicorn==0.29.0
-google-cloud-bigquery==3.20.1
-google-auth-oauthlib==1.2.0
-google-auth==2.29.0
-pyarrow==16.0.0
+# Pinned versions — last updated 2025-08 (v20 release).
+# To check for vulnerabilities: pip install pip-audit && pip-audit -r requirements.txt
+# To update: bump versions below, test on dev, then deploy to production.
+fastapi==0.133.1
+uvicorn==0.34.0
+google-cloud-bigquery==3.31.0
+google-auth-oauthlib==1.2.1
+google-auth==2.40.1
+pyarrow==19.0.1
 itsdangerous==2.2.0
-httpx==0.27.0
-python-dotenv==1.0.1
+httpx==0.28.1
+python-dotenv==1.1.0

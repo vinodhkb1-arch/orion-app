@@ -1,6 +1,14 @@
 /**
+ * The BigQuery dataset used by all backend queries and export SQL.
+ * Update here when the dataset version changes — this is the single source
+ * of truth for the frontend. The backend reads the same value from main.py:SOURCE.
+ */
+export const ORION_SOURCE = 'cwts-leiden.openalex_2025aug';
+
+/**
  * Thin fetch wrapper — if the backend returns 401 (session expired or missing),
  * redirect to the login page automatically.
+ * For other errors, tries to surface the backend's detail message if available.
  */
 export async function apiFetch(url, options = {}) {
   const res = await fetch(url, options);
@@ -8,13 +16,20 @@ export async function apiFetch(url, options = {}) {
     window.location.href = '/?error=session_expired';
     return null;
   }
-  if (!res.ok) throw new Error(res.status);
+  if (!res.ok) {
+    let detail = String(res.status);
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = body.detail;
+    } catch {}
+    throw new Error(detail);
+  }
   return res.json();
 }
 
 /**
  * Download an array of objects as a CSV file.
- * @param {object[]} rows   - array of plain objects
+ * @param {object[]} rows     - array of plain objects
  * @param {string}   filename - e.g. "institutions.csv"
  */
 export function exportCsv(rows, filename = 'export.csv') {
