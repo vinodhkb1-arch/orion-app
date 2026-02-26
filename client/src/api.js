@@ -46,6 +46,9 @@ export async function openVosViewer(buildUrl, body) {
   const tokenUrl = `${window.location.origin}/api/vos/${res.token}`;
   window.open(`https://app.vosviewer.com/?json=${encodeURIComponent(tokenUrl)}`, '_blank');
 }
+
+/**
+ * Download an array of objects as a CSV file.
  * @param {object[]} rows     - array of plain objects
  * @param {string}   filename - e.g. "institutions.csv"
  */
