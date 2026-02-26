@@ -81,6 +81,8 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
           <input type="number" value={yearTo} onChange={e => setYT(Number(e.target.value))}/>
         </div>
         <button className="btn" onClick={apply}>Search</button>
+        {rows.length > 0 && <button className="btn ghost" onClick={() => exportCsv(rows, 'institutions.csv')}>⬇ CSV</button>}
+        {rows.length > 0 && <BytesTag bytes={bytesProcessed} />}
       </div>
 
       <div className="split-layout">
@@ -96,7 +98,6 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
                   <SortTh k="type">Type</SortTh>
                   <SortTh k="country">Country</SortTh>
                   <SortTh k="works_count">Works</SortTh>
-                  <SortTh k="fractional_count">Frac.</SortTh>
                   <th></th>
                 </tr></thead>
                 <tbody>
@@ -109,7 +110,7 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
                       <td>{r.type ? <span className="badge-type">{r.type}</span> : '—'}</td>
                       <td>{r.country ? <span className="badge-country">{r.country}</span> : '—'}</td>
                       <td className="works">{Number(r.works_count).toLocaleString()}</td>
-                      <td className="frac">{Number(r.fractional_count).toLocaleString(undefined, {maximumFractionDigits:1})}</td>
+                      {/* <td className="frac">{Number(r.fractional_count).toLocaleString(undefined, {maximumFractionDigits:1})}</td> */}
                       <td onClick={e => e.stopPropagation()}>
                         {inBasket(r.institution_id)
                           ? <span style={{color:'#4ade80',fontSize:'.8rem'}}>✓</span>
@@ -122,8 +123,7 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
               <div className="tbl-footer">
                 <span>Showing {visibleRows.length} of {rows.length} results</span>
                 {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
-                <BytesTag bytes={bytesProcessed} />
-                <button className="btn ghost" onClick={() => exportCsv(rows, 'institutions.csv')}>⬇ CSV</button>
+              </div>
               </div>
             </div>
           )}
@@ -149,7 +149,7 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
                   <Tooltip contentStyle={{background:'#1a1d27',border:'1px solid #2d3148',borderRadius:6}} labelStyle={{color:'#94a3b8'}}/>
                   <Legend wrapperStyle={{fontSize:'.75rem',color:'#94a3b8'}}/>
                   <Line type="monotone" dataKey="works_count" name="Works" stroke="#7c8cff" strokeWidth={2} dot={false} activeDot={{r:3}}/>
-                  <Line type="monotone" dataKey="fractional_count" name="Fractional" stroke="#a78bfa" strokeWidth={2} dot={false} strokeDasharray="4 2" activeDot={{r:3}}/>
+                  {/* <Line type="monotone" dataKey="fractional_count" name="Fractional" stroke="#a78bfa" strokeWidth={2} dot={false} strokeDasharray="4 2" activeDot={{r:3}}/> */}
                 </LineChart>
               </ResponsiveContainer>
               {trendBytes != null && (

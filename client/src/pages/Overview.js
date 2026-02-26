@@ -34,11 +34,13 @@ export default function Overview({ setPage }) {
             title: 'Works → Institutions',
             body: 'The link is work → authorship → institution. An authorship is one author\'s contribution to a work, and the institution is assigned solely from the affiliation that author declared on that paper — not from any other known affiliations of the author.',
           },
+          /* FRACTIONAL COUNT — hidden for now, re-enable by uncommenting
           {
             icon: '½',
             title: 'Fractional count',
             body: 'Because a paper can have many authors across many institutions, fractional count avoids double-counting by allocating only a share of each work to each institution. The paper is first split equally among its authors, and each author\'s share is then split equally among their listed affiliations.',
           },
+          */
           {
             icon: '💰',
             title: 'Works → Funders',

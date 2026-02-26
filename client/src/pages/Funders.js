@@ -81,6 +81,8 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
           <input type="number" value={yearTo} onChange={e => setYT(Number(e.target.value))}/>
         </div>
         <button className="btn" onClick={apply}>Search</button>
+        {rows.length > 0 && <button className="btn ghost" onClick={() => exportCsv(rows, 'funders.csv')}>⬇ CSV</button>}
+        {rows.length > 0 && <BytesTag bytes={bytesProcessed} />}
       </div>
 
       <div className="split-layout">
@@ -120,8 +122,6 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
               <div className="tbl-footer">
                 <span>Showing {visibleRows.length} of {rows.length} results</span>
                 {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
-                <BytesTag bytes={bytesProcessed} />
-                <button className="btn ghost" onClick={() => exportCsv(rows, 'funders.csv')}>⬇ CSV</button>
               </div>
             </div>
           )}

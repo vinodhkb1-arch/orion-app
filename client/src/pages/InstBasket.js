@@ -10,7 +10,6 @@ export default function InstBasket({ basket, removeFromBasket, basketData, setBa
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const funderTable = useTable(results?.funders || [], 1000);
-  const collabTable = useTable(results?.collaborators || [], 1000);
 
   const analyze = () => {
     if (!basket.length) return;
@@ -58,58 +57,42 @@ export default function InstBasket({ basket, removeFromBasket, basketData, setBa
               <input type="number" value={yearTo} onChange={e => setYT(Number(e.target.value))} />
             </div>
             <button className="btn success" onClick={analyze} disabled={loading}>{loading ? 'Running...' : 'Analyze basket'}</button>
+            {results && <BytesTag bytes={results.bytes_processed} />}
           </div>
           {error && <div className="status" style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
           {results && (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
-                <div className="cards" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', margin: 0, flex: 1 }}>
-                  <div className="stat-box">
-                    <div className="stat-val">{Number(results.total_works).toLocaleString()}</div>
-                    <div className="stat-frac">({Number(results.total_fractional).toLocaleString(undefined, { maximumFractionDigits: 1 })} frac.)</div>
-                    <div className="stat-lbl">Total works {savedYF}–{savedYT}<br /><small style={{ color: '#334155' }}>No double counting</small></div>
-                  </div>
-                  <div className="stat-box"><div className="stat-val">{basket.length}</div><div className="stat-lbl">Institutions</div></div>
+              <div className="cards" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', marginBottom: '1.5rem' }}>
+                <div className="stat-box">
+                  <div className="stat-val">{Number(results.total_works).toLocaleString()}</div>
+                  <div className="stat-lbl">Total works {savedYF}–{savedYT}<br /><small style={{ color: '#334155' }}>No double counting</small></div>
                 </div>
-                {results.bytes_processed != null && (
-                  <div style={{ alignSelf: 'flex-end', paddingBottom: '.25rem' }}>
-                    <BytesTag bytes={results.bytes_processed} />
-                  </div>
-                )}
+                <div className="stat-box">
+                  <div className="stat-val">{basket.length}</div>
+                  <div className="stat-lbl">Institutions</div>
+                </div>
               </div>
-              <div className="results-grid">
-                <div>
-                  <div className="section-title">Top funders</div>
-                  <div className="table-wrap">
-                    <table>
-                      <thead><tr><th>#</th>{STh(funderTable, 'name', 'Funder')}{STh(funderTable, 'country', 'Country')}{STh(funderTable, 'works_count', 'Works')}</tr></thead>
-                      <tbody>
-                        {funderTable.visibleRows.map((f, i) => (
-                          <tr key={i}><td className="rank">{i + 1}</td><td>{f.name}</td>
-                            <td>{f.country ? <span className="badge-country">{f.country}</span> : '—'}</td>
-                            <td className="works">{Number(f.works_count).toLocaleString()}</td></tr>
-                        ))}
-                        {!funderTable.visibleRows.length && <tr><td colSpan="4" className="status">None found.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <div>
-                  <div className="section-title">Top collaborating institutions</div>
-                  <div className="table-wrap">
-                    <table>
-                      <thead><tr><th>#</th>{STh(collabTable, 'name', 'Institution')}{STh(collabTable, 'country', 'Country')}{STh(collabTable, 'works_count', 'Co-authored')}</tr></thead>
-                      <tbody>
-                        {collabTable.visibleRows.map((c, i) => (
-                          <tr key={i}><td className="rank">{i + 1}</td><td>{c.name}</td>
-                            <td>{c.country ? <span className="badge-country">{c.country}</span> : '—'}</td>
-                            <td className="works">{Number(c.works_count).toLocaleString()}</td></tr>
-                        ))}
-                        {!collabTable.visibleRows.length && <tr><td colSpan="4" className="status">None found.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              <div className="section-title">Top funders</div>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr>
+                    <th>#</th>
+                    {STh(funderTable, 'name', 'Funder')}
+                    {STh(funderTable, 'country', 'Country')}
+                    {STh(funderTable, 'works_count', 'Works')}
+                  </tr></thead>
+                  <tbody>
+                    {funderTable.visibleRows.map((f, i) => (
+                      <tr key={i}>
+                        <td className="rank">{i + 1}</td>
+                        <td>{f.name}</td>
+                        <td>{f.country ? <span className="badge-country">{f.country}</span> : '—'}</td>
+                        <td className="works">{Number(f.works_count).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                    {!funderTable.visibleRows.length && <tr><td colSpan="4" className="status">None found.</td></tr>}
+                  </tbody>
+                </table>
               </div>
             </>
           )}
@@ -118,3 +101,4 @@ export default function InstBasket({ basket, removeFromBasket, basketData, setBa
     </div>
   );
 }
+
