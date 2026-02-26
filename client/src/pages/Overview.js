@@ -5,6 +5,7 @@ const NAV_CARDS = [
   { key: 'funders',        icon: '💰',  label: 'Funders'            },
   { key: 'inst-basket',    icon: '🛒',  label: 'Institution Basket' },
   { key: 'funder-basket',  icon: '🛒',  label: 'Funder Basket'      },
+  { key: 'guide',          icon: '📖',  label: 'Guide'              },
 ];
 
 export default function Overview({ setPage }) {

@@ -4,6 +4,7 @@ import Institutions from './pages/Institutions';
 import Funders from './pages/Funders';
 import InstBasket from './pages/InstBasket';
 import FunderBasket from './pages/FunderBasket';
+import Guide from './pages/Guide';
 import LoginGate from './pages/LoginGate';
 import ErrorPage from './pages/ErrorPage';
 
@@ -79,6 +80,7 @@ export default function App() {
         {navItem('funders', 'Funders', 0)}
         {navItem('inst-basket', 'Inst. Basket', instBasket.length)}
         {navItem('funder-basket', 'Funder Basket', funderBasket.length)}
+        {navItem('guide', 'Guide', 0)}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span style={{ fontSize: '.75rem', color: '#475569' }} title={authState.email}>
             {authState.name || authState.email}
@@ -94,6 +96,7 @@ export default function App() {
       {page === 'funders'       && <Funders funderData={funderData} setFunderData={setFunderData} basket={funderBasket} addToBasket={addFunder} />}
       {page === 'inst-basket'   && <InstBasket basket={instBasket} removeFromBasket={removeInst} basketData={instBasketData} setBasketData={setInstBasketData} />}
       {page === 'funder-basket' && <FunderBasket basket={funderBasket} removeFromBasket={removeFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} />}
+      {page === 'guide'         && <Guide />}
     </>
   );
 }

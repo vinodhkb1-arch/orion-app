@@ -27,7 +27,6 @@ OAUTH_REDIRECT_URI  = os.environ["OAUTH_REDIRECT_URI"]
 SESSION_SECRET      = os.environ["SESSION_SECRET"]
 
 SOURCE   = "cwts-leiden.openalex_2025aug"
-BQ_CACHE = "dashboard-488117.orion_cache"
 
 # Identity only — no BigQuery scope needed from the user
 SCOPES = [
@@ -231,13 +230,12 @@ def institutions_top(
             i.country_iso_alpha2_code AS country,
             i.thumbnail_url, i.openalex_id,
             it.institution_type AS type,
-            COALESCE(SUM(wc.works_count), 0) AS works_count
+            COUNT(DISTINCT wai.work_id) AS works_count
         FROM `{SOURCE}.institution` i
         LEFT JOIN `{SOURCE}.institution_type` it ON i.institution_type_id = it.institution_type_id
-        LEFT JOIN `{BQ_CACHE}.orion_works_counts` wc
-            ON i.institution_id = wc.institution_id AND wc.pub_year BETWEEN @year_from AND @year_to
-        -- LEFT JOIN `{BQ_CACHE}.orion_fractional_counts` fc
-        --     ON i.institution_id = fc.institution_id AND fc.pub_year BETWEEN @year_from AND @year_to
+        LEFT JOIN `{SOURCE}.work_affiliation_institution` wai ON i.institution_id = wai.institution_id
+        LEFT JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
+            AND w.pub_year BETWEEN @year_from AND @year_to
         GROUP BY 1,2,3,4,5,6
         ORDER BY works_count DESC
         LIMIT @limit
@@ -265,13 +263,12 @@ def institutions_search(
             i.country_iso_alpha2_code AS country,
             i.thumbnail_url, i.openalex_id,
             it.institution_type AS type,
-            COALESCE(SUM(wc.works_count), 0) AS works_count
+            COUNT(DISTINCT wai.work_id) AS works_count
         FROM `{SOURCE}.institution` i
         LEFT JOIN `{SOURCE}.institution_type` it ON i.institution_type_id = it.institution_type_id
-        LEFT JOIN `{BQ_CACHE}.orion_works_counts` wc
-            ON i.institution_id = wc.institution_id AND wc.pub_year BETWEEN @year_from AND @year_to
-        -- LEFT JOIN `{BQ_CACHE}.orion_fractional_counts` fc
-        --     ON i.institution_id = fc.institution_id AND fc.pub_year BETWEEN @year_from AND @year_to
+        LEFT JOIN `{SOURCE}.work_affiliation_institution` wai ON i.institution_id = wai.institution_id
+        LEFT JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
+            AND w.pub_year BETWEEN @year_from AND @year_to
         WHERE LOWER({col}) LIKE @pattern
         GROUP BY 1,2,3,4,5,6
         ORDER BY works_count DESC
@@ -285,13 +282,12 @@ def institution_trends(request: Request, institution_id: int):
     """Return year-by-year works count for one institution."""
     session = require_auth(request)
     sql = f"""
-        SELECT wc.pub_year AS year, wc.works_count
-        FROM `{BQ_CACHE}.orion_works_counts` wc
-        -- To re-enable fractional counts, add:
-        -- , COALESCE(fc.fractional_count, 0) AS fractional_count
-        -- LEFT JOIN `{BQ_CACHE}.orion_fractional_counts` fc
-        --     ON wc.institution_id = fc.institution_id AND wc.pub_year = fc.pub_year
-        WHERE wc.institution_id = @id
+        SELECT w.pub_year AS year, COUNT(DISTINCT wai.work_id) AS works_count
+        FROM `{SOURCE}.work_affiliation_institution` wai
+        JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
+        -- To re-enable fractional counts, join orion_fractional_counts here
+        WHERE wai.institution_id = @id
+        GROUP BY year
         ORDER BY year
     """
     rows, bp = run_query(sql, {"id": institution_id}, session["project_id"])

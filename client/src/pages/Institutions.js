@@ -124,7 +124,6 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
                 <span>Showing {visibleRows.length} of {rows.length} results</span>
                 {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
               </div>
-              </div>
             </div>
           )}
         </div>
