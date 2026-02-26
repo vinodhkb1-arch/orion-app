@@ -368,27 +368,63 @@ class InstBasketRequest(BaseModel):
     institution_ids: List[int]
     year_from: int = 2000
     year_to: int = 2025
-    limit: int = 50
+    limit: int = 1000
 
-@app.post("/api/basket/institutions/analyze")
-def basket_institutions_analyze(req: InstBasketRequest, request: Request):
+@app.post("/api/basket/institutions/works")
+def basket_inst_works(req: InstBasketRequest, request: Request):
+    """Total distinct works for a basket of institutions."""
     session = require_auth(request)
     pid = session["project_id"]
     if not req.institution_ids:
-        return cached({"total_works": 0, "funders": []}, CACHE_OFF)
-
-    yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.institution_ids
-
-    total_works_rows, bp1 = run_query(f"""
+        return cached({"total_works": 0, "bytes_processed": 0}, CACHE_OFF)
+    yf, yt, ids = req.year_from, req.year_to, req.institution_ids
+    rows, bp = run_query(f"""
         SELECT COUNT(DISTINCT wai.work_id) AS total_works
         FROM `{SOURCE}.work_affiliation_institution` wai
         JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
         WHERE wai.institution_id IN UNNEST(@ids)
           AND w.pub_year BETWEEN @year_from AND @year_to
     """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
+    return cached({"total_works": rows[0]["total_works"] if rows else 0, "bytes_processed": bp}, CACHE_OFF)
 
-    funders, bp2 = run_query(f"""
-        SELECT f.funder_id, f.funder AS name, f.country_iso_alpha2_code AS country,
+@app.post("/api/basket/institutions/co-institutions")
+def basket_inst_co_institutions(req: InstBasketRequest, request: Request):
+    """Institutions that co-occur (at work level) with the basket institutions."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.institution_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.institution_ids
+    rows, bp = run_query(f"""
+        SELECT i.institution_id, i.institution AS name,
+               i.country_iso_alpha2_code AS country,
+               it.institution_type AS type,
+               COUNT(DISTINCT wai2.work_id) AS works_count
+        FROM `{SOURCE}.work_affiliation_institution` wai
+        JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
+        JOIN `{SOURCE}.work_affiliation_institution` wai2
+            ON wai.work_id = wai2.work_id
+           AND wai2.institution_id NOT IN UNNEST(@ids)
+        JOIN `{SOURCE}.institution` i ON wai2.institution_id = i.institution_id
+        LEFT JOIN `{SOURCE}.institution_type` it ON i.institution_type_id = it.institution_type_id
+        WHERE wai.institution_id IN UNNEST(@ids)
+          AND w.pub_year BETWEEN @year_from AND @year_to
+        GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code, it.institution_type
+        ORDER BY works_count DESC LIMIT @limit
+    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+
+@app.post("/api/basket/institutions/co-funders")
+def basket_inst_co_funders(req: InstBasketRequest, request: Request):
+    """Funders that co-occur (at work level) with the basket institutions."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.institution_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.institution_ids
+    rows, bp = run_query(f"""
+        SELECT f.funder_id, f.funder AS name,
+               f.country_iso_alpha2_code AS country,
                COUNT(DISTINCT wg.work_id) AS works_count
         FROM `{SOURCE}.work_affiliation_institution` wai
         JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
@@ -399,12 +435,7 @@ def basket_institutions_analyze(req: InstBasketRequest, request: Request):
         GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code
         ORDER BY works_count DESC LIMIT @limit
     """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
-
-    return cached({
-        "total_works": total_works_rows[0]["total_works"] if total_works_rows else 0,
-        "funders": funders,
-        "bytes_processed": bp1 + bp2,
-    }, CACHE_OFF)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
 
 # ── Funder Basket ─────────────────────────────────────────────────────────────
 
@@ -412,29 +443,38 @@ class FunderBasketRequest(BaseModel):
     funder_ids: List[int]
     year_from: int = 2000
     year_to: int = 2025
-    limit: int = 50
+    limit: int = 1000
 
-@app.post("/api/basket/funders/analyze")
-def basket_funders_analyze(req: FunderBasketRequest, request: Request):
-    """Analyze a basket of funders: total funded works and top institutions."""
+@app.post("/api/basket/funders/works")
+def basket_funder_works(req: FunderBasketRequest, request: Request):
+    """Total distinct works funded by the basket funders."""
     session = require_auth(request)
     pid = session["project_id"]
     if not req.funder_ids:
-        return cached({"total_works": 0, "institutions": [], "bytes_processed": 0}, CACHE_OFF)
-
-    yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.funder_ids
-
-    total_works_rows, bp1 = run_query(f"""
+        return cached({"total_works": 0, "bytes_processed": 0}, CACHE_OFF)
+    yf, yt, ids = req.year_from, req.year_to, req.funder_ids
+    rows, bp = run_query(f"""
         SELECT COUNT(DISTINCT wg.work_id) AS total_works
         FROM `{SOURCE}.work_grant` wg
         JOIN `{SOURCE}.work` w ON wg.work_id = w.work_id
         WHERE wg.funder_id IN UNNEST(@ids)
           AND w.pub_year BETWEEN @year_from AND @year_to
     """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
+    return cached({"total_works": rows[0]["total_works"] if rows else 0, "bytes_processed": bp}, CACHE_OFF)
 
-    institutions, bp2 = run_query(f"""
-        SELECT i.institution_id, i.institution AS name, i.country_iso_alpha2_code AS country,
-               it.institution_type AS type, COUNT(DISTINCT wai.work_id) AS works_count
+@app.post("/api/basket/funders/co-institutions")
+def basket_funder_co_institutions(req: FunderBasketRequest, request: Request):
+    """Institutions that co-occur (at work level) with the basket funders."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.funder_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.funder_ids
+    rows, bp = run_query(f"""
+        SELECT i.institution_id, i.institution AS name,
+               i.country_iso_alpha2_code AS country,
+               it.institution_type AS type,
+               COUNT(DISTINCT wai.work_id) AS works_count
         FROM `{SOURCE}.work_grant` wg
         JOIN `{SOURCE}.work` w ON wg.work_id = w.work_id
         JOIN `{SOURCE}.work_affiliation_institution` wai ON w.work_id = wai.work_id
@@ -445,12 +485,32 @@ def basket_funders_analyze(req: FunderBasketRequest, request: Request):
         GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code, it.institution_type
         ORDER BY works_count DESC LIMIT @limit
     """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
 
-    return cached({
-        "total_works": total_works_rows[0]["total_works"] if total_works_rows else 0,
-        "institutions": institutions,
-        "bytes_processed": bp1 + bp2,
-    }, CACHE_OFF)
+@app.post("/api/basket/funders/co-funders")
+def basket_funder_co_funders(req: FunderBasketRequest, request: Request):
+    """Funders that co-occur (at work level) with the basket funders."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.funder_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.funder_ids
+    rows, bp = run_query(f"""
+        SELECT f.funder_id, f.funder AS name,
+               f.country_iso_alpha2_code AS country,
+               COUNT(DISTINCT wg2.work_id) AS works_count
+        FROM `{SOURCE}.work_grant` wg
+        JOIN `{SOURCE}.work` w ON wg.work_id = w.work_id
+        JOIN `{SOURCE}.work_grant` wg2
+            ON wg.work_id = wg2.work_id
+           AND wg2.funder_id NOT IN UNNEST(@ids)
+        JOIN `{SOURCE}.funder` f ON wg2.funder_id = f.funder_id
+        WHERE wg.funder_id IN UNNEST(@ids)
+          AND w.pub_year BETWEEN @year_from AND @year_to
+        GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code
+        ORDER BY works_count DESC LIMIT @limit
+    """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
 
