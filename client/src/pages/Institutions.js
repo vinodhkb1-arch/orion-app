@@ -1,21 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import useTable from './useTable';
-import { apiFetch } from '../api';
+import { apiFetch, exportCsv } from '../api';
+import { BytesTag } from '../bytesInfo';
 
 const FIELDS = [{value:'name',label:'Name'},{value:'country',label:'Country (ISO)'},{value:'type',label:'Type'}];
 
 export default function Institutions({ instData, setInstData, basket, addToBasket }) {
-  const { rows, yearFrom: fetchedYF, yearTo: fetchedYT } = instData;
-  const [loading, setLoading]   = useState(false);
-  const [q, setQ]               = useState('');
-  const [field, setField]       = useState('name');
-  const [yearFrom, setYF]       = useState(fetchedYF);
-  const [yearTo, setYT]         = useState(fetchedYT);
-  const [sel, setSel]           = useState(null);
-  const [trends, setTrends]     = useState([]);
-  const [tl, setTl]             = useState(false);
+  const { rows, yearFrom: fetchedYF, yearTo: fetchedYT, bytesProcessed } = instData;
+  const [loading, setLoading]       = useState(false);
+  const [q, setQ]                   = useState('');
+  const [field, setField]           = useState('name');
+  const [yearFrom, setYF]           = useState(fetchedYF);
+  const [yearTo, setYT]             = useState(fetchedYT);
+  const [sel, setSel]               = useState(null);
+  const [trends, setTrends]         = useState([]);
+  const [trendBytes, setTrendBytes] = useState(null);
+  const [tl, setTl]                 = useState(false);
   const { visibleRows, onSort, sortIcon, sortKey } = useTable(rows, 1000);
+
+  const debounceRef = useRef(null);
 
   const fetchData = (yf, yt, sq, sf) => {
     setLoading(true);
@@ -23,25 +27,38 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
       ? `/api/institutions/search?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=1000`
       : `/api/institutions/top?year_from=${yf}&year_to=${yt}&limit=1000`;
     apiFetch(url)
-      .then(d => { if (d) { setInstData({rows:d,yearFrom:yf,yearTo:yt}); } setLoading(false); })
-      .catch(() => { setInstData({rows:[],yearFrom:yf,yearTo:yt}); setLoading(false); });
+      .then(d => {
+        if (d) setInstData({ rows: d.rows, yearFrom: yf, yearTo: yt, bytesProcessed: d.bytes_processed });
+        setLoading(false);
+      })
+      .catch(() => { setInstData({ rows: [], yearFrom: yf, yearTo: yt, bytesProcessed: null }); setLoading(false); });
   };
 
   const apply = () => fetchData(yearFrom, yearTo, q, field);
 
+  // Debounce: fire search 400 ms after the user stops typing
+  useEffect(() => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (q.trim()) fetchData(yearFrom, yearTo, q, field);
+    }, 400);
+    return () => clearTimeout(debounceRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+
   const pick = row => {
-    if (sel?.institution_id===row.institution_id) { setSel(null);setTrends([]);return; }
-    setSel(row); setTl(true);
+    if (sel?.institution_id === row.institution_id) { setSel(null); setTrends([]); setTrendBytes(null); return; }
+    setSel(row); setTl(true); setTrendBytes(null);
     apiFetch(`/api/institutions/${row.institution_id}/trends`)
-      .then(d => { if (d) setTrends(d); setTl(false); })
+      .then(d => { if (d) { setTrends(d.rows); setTrendBytes(d.bytes_processed); } setTl(false); })
       .catch(() => setTl(false));
   };
 
-  const inBasket = id => basket.some(b=>b.institution_id===id);
+  const inBasket = id => basket.some(b => b.institution_id === id);
   const filteredTrends = trends.filter(t => t.year >= fetchedYF && t.year <= fetchedYT);
 
-  const SortTh = ({k,children}) => (
-    <th onClick={()=>onSort(k)} className={sortKey===k?'sorted':''}>{children}{sortIcon(k)}</th>
+  const SortTh = ({k, children}) => (
+    <th onClick={() => onSort(k)} className={sortKey === k ? 'sorted' : ''}>{children}{sortIcon(k)}</th>
   );
 
   return (
@@ -50,18 +67,18 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
       <div className="controls">
         <div className="field-group">
           <label>Search by</label>
-          <select value={field} onChange={e=>setField(e.target.value)}>
-            {FIELDS.map(f=><option key={f.value} value={f.value}>{f.label}</option>)}
+          <select value={field} onChange={e => setField(e.target.value)}>
+            {FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
         </div>
-        <input type="text" placeholder={`Search by ${FIELDS.find(f=>f.value===field)?.label}…`}
-          value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&apply()}/>
+        <input type="text" placeholder={`Search by ${FIELDS.find(f => f.value === field)?.label}…`}
+          value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && apply()}/>
         <div className="divider"/>
         <div className="field-group">
           <label>Years</label>
-          <input type="number" value={yearFrom} onChange={e=>setYF(Number(e.target.value))}/>
+          <input type="number" value={yearFrom} onChange={e => setYF(Number(e.target.value))}/>
           <label>–</label>
-          <input type="number" value={yearTo} onChange={e=>setYT(Number(e.target.value))}/>
+          <input type="number" value={yearTo} onChange={e => setYT(Number(e.target.value))}/>
         </div>
         <button className="btn" onClick={apply}>Search</button>
       </div>
@@ -69,8 +86,8 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
       <div className="split-layout">
         <div>
           {loading && <div className="status">Loading…</div>}
-          {!loading && rows.length===0 && <div className="status">Use the controls above and click Search to load data.</div>}
-          {!loading && rows.length>0 && (
+          {!loading && rows.length === 0 && <div className="status">Use the controls above and click Search to load data.</div>}
+          {!loading && rows.length > 0 && (
             <div className="table-wrap">
               <table>
                 <thead><tr>
@@ -83,20 +100,20 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
                   <th></th>
                 </tr></thead>
                 <tbody>
-                  {visibleRows.map((r,i)=>(
-                    <tr key={r.institution_id} onClick={()=>pick(r)}
-                      className={sel?.institution_id===r.institution_id?'selected':inBasket(r.institution_id)?'in-basket':''}>
+                  {visibleRows.map((r, i) => (
+                    <tr key={r.institution_id} onClick={() => pick(r)}
+                      className={sel?.institution_id === r.institution_id ? 'selected' : inBasket(r.institution_id) ? 'in-basket' : ''}>
                       <td className="rank">{i+1}</td>
-                      <td>{r.thumbnail_url?<img className="thumb" src={r.thumbnail_url} alt=""/>:<div className="thumb"/>}</td>
+                      <td>{r.thumbnail_url ? <img className="thumb" src={r.thumbnail_url} alt=""/> : <div className="thumb"/>}</td>
                       <td>{r.name}</td>
-                      <td>{r.type?<span className="badge-type">{r.type}</span>:'—'}</td>
-                      <td>{r.country?<span className="badge-country">{r.country}</span>:'—'}</td>
+                      <td>{r.type ? <span className="badge-type">{r.type}</span> : '—'}</td>
+                      <td>{r.country ? <span className="badge-country">{r.country}</span> : '—'}</td>
                       <td className="works">{Number(r.works_count).toLocaleString()}</td>
-                      <td className="frac">{Number(r.fractional_count).toLocaleString(undefined,{maximumFractionDigits:1})}</td>
-                      <td onClick={e=>e.stopPropagation()}>
+                      <td className="frac">{Number(r.fractional_count).toLocaleString(undefined, {maximumFractionDigits:1})}</td>
+                      <td onClick={e => e.stopPropagation()}>
                         {inBasket(r.institution_id)
                           ? <span style={{color:'#4ade80',fontSize:'.8rem'}}>✓</span>
-                          : <button className="btn secondary" style={{padding:'.2rem .5rem',fontSize:'.75rem'}} onClick={()=>addToBasket(r)}>+</button>}
+                          : <button className="btn secondary" style={{padding:'.2rem .5rem',fontSize:'.75rem'}} onClick={() => addToBasket(r)}>+</button>}
                       </td>
                     </tr>
                   ))}
@@ -105,6 +122,8 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
               <div className="tbl-footer">
                 <span>Showing {visibleRows.length} of {rows.length} results</span>
                 {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
+                <BytesTag bytes={bytesProcessed} />
+                <button className="btn ghost" onClick={() => exportCsv(rows, 'institutions.csv')}>⬇ CSV</button>
               </div>
             </div>
           )}
@@ -113,25 +132,32 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
         <div className="chart-panel">
           <div className="panel-title">
             {sel
-              ? <>{sel.name}{sel.openalex_id&&<a href={`https://openalex.org/${sel.openalex_id}`} target="_blank" rel="noreferrer" style={{marginLeft:'.5rem',color:'#7c8cff',fontSize:'.75rem'}}>↗</a>}</>
+              ? <>{sel.name}{sel.openalex_id && <a href={`https://openalex.org/${sel.openalex_id}`} target="_blank" rel="noreferrer" style={{marginLeft:'.5rem',color:'#7c8cff',fontSize:'.75rem'}}>↗</a>}</>
               : '📈 Click a row to see trends'}
           </div>
           {!sel && <div className="panel-hint">Select an institution from the table</div>}
           {sel && tl && <div className="panel-hint">Loading…</div>}
-          {sel && !tl && filteredTrends.length===0 && <div className="panel-hint">No data for {fetchedYF}–{fetchedYT}</div>}
-          {sel && !tl && filteredTrends.length>0 && (
-            <ResponsiveContainer width="100%" height={230}>
-              <LineChart data={filteredTrends} margin={{top:4,right:8,bottom:4,left:0}}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2d3148"/>
-                <XAxis dataKey="year" stroke="#475569" tick={{fontSize:10}}
-                  domain={[fetchedYF, fetchedYT]} type="number" allowDataOverflow/>
-                <YAxis stroke="#475569" tick={{fontSize:10}} width={45}/>
-                <Tooltip contentStyle={{background:'#1a1d27',border:'1px solid #2d3148',borderRadius:6}} labelStyle={{color:'#94a3b8'}}/>
-                <Legend wrapperStyle={{fontSize:'.75rem',color:'#94a3b8'}}/>
-                <Line type="monotone" dataKey="works_count" name="Works" stroke="#7c8cff" strokeWidth={2} dot={false} activeDot={{r:3}}/>
-                <Line type="monotone" dataKey="fractional_count" name="Fractional" stroke="#a78bfa" strokeWidth={2} dot={false} strokeDasharray="4 2" activeDot={{r:3}}/>
-              </LineChart>
-            </ResponsiveContainer>
+          {sel && !tl && filteredTrends.length === 0 && <div className="panel-hint">No data for {fetchedYF}–{fetchedYT}</div>}
+          {sel && !tl && filteredTrends.length > 0 && (
+            <>
+              <ResponsiveContainer width="100%" height={210}>
+                <LineChart data={filteredTrends} margin={{top:4,right:8,bottom:4,left:0}}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2d3148"/>
+                  <XAxis dataKey="year" stroke="#475569" tick={{fontSize:10}}
+                    domain={[fetchedYF, fetchedYT]} type="number" allowDataOverflow/>
+                  <YAxis stroke="#475569" tick={{fontSize:10}} width={45}/>
+                  <Tooltip contentStyle={{background:'#1a1d27',border:'1px solid #2d3148',borderRadius:6}} labelStyle={{color:'#94a3b8'}}/>
+                  <Legend wrapperStyle={{fontSize:'.75rem',color:'#94a3b8'}}/>
+                  <Line type="monotone" dataKey="works_count" name="Works" stroke="#7c8cff" strokeWidth={2} dot={false} activeDot={{r:3}}/>
+                  <Line type="monotone" dataKey="fractional_count" name="Fractional" stroke="#a78bfa" strokeWidth={2} dot={false} strokeDasharray="4 2" activeDot={{r:3}}/>
+                </LineChart>
+              </ResponsiveContainer>
+              {trendBytes != null && (
+                <div style={{textAlign:'right',marginTop:'.4rem'}}>
+                  <BytesTag bytes={trendBytes}/>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

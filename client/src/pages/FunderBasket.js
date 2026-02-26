@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import useTable from './useTable';
 import { apiFetch } from '../api';
+import { BytesTag } from '../bytesInfo';
 
 export default function FunderBasket({ basket, removeFromBasket, basketData, setBasketData }) {
   const { results, yearFrom: savedYF, yearTo: savedYT } = basketData;
-  const [yearFrom, setYF]     = useState(savedYF);
-  const [yearTo, setYT]       = useState(savedYT);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const instTable = useTable(results?.institutions || [], 1000);
+  const [yearFrom, setYF]             = useState(savedYF);
+  const [yearTo, setYT]               = useState(savedYT);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
+  const [includeCollabs, setInclude]  = useState(false);
+  const instTable   = useTable(results?.institutions || [], 1000);
+  const collabTable = useTable(results?.collaborators || [], 1000);
 
   const analyze = () => {
     if (!basket.length) return;
@@ -16,7 +19,13 @@ export default function FunderBasket({ basket, removeFromBasket, basketData, set
     apiFetch('/api/basket/funders/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ funder_ids: basket.map(b => Number(b.funder_id)), year_from: yearFrom, year_to: yearTo, limit: 1000 }),
+      body: JSON.stringify({
+        funder_ids: basket.map(b => Number(b.funder_id)),
+        year_from: yearFrom,
+        year_to: yearTo,
+        limit: 1000,
+        include_collaborators: includeCollabs,
+      }),
     })
       .then(d => { if (d) setBasketData({ results: d, yearFrom, yearTo }); setLoading(false); })
       .catch(e => { setError('Query failed (' + e.message + ')'); setLoading(false); });
@@ -52,42 +61,92 @@ export default function FunderBasket({ basket, removeFromBasket, basketData, set
               <label>to</label>
               <input type="number" value={yearTo} onChange={e => setYT(Number(e.target.value))} />
             </div>
+            <div className="field-group" style={{ gap: '.4rem' }}>
+              <input
+                type="checkbox"
+                id="include-collabs"
+                checked={includeCollabs}
+                onChange={e => setInclude(e.target.checked)}
+                style={{ accentColor: '#7c8cff', width: '14px', height: '14px', cursor: 'pointer' }}
+              />
+              <label htmlFor="include-collabs" style={{ cursor: 'pointer', userSelect: 'none' }}>
+                Include co-authoring institutions
+              </label>
+              <span title="Institutions that co-authored papers with funded institutions, but are not themselves funded by this basket. Adds an extra BigQuery query." style={{ color: '#475569', fontSize: '.85rem', cursor: 'help' }}>ⓘ</span>
+            </div>
             <button className="btn success" onClick={analyze} disabled={loading}>{loading ? 'Running...' : 'Analyze basket'}</button>
           </div>
           {error && <div className="status" style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
           {results && (
             <>
-              <div className="cards" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))' }}>
-                <div className="stat-box">
-                  <div className="stat-val">{Number(results.total_works).toLocaleString()}</div>
-                  <div className="stat-lbl">Total funded works {savedYF}–{savedYT}<br /><small style={{ color: '#334155' }}>No double counting</small></div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
+                <div className="cards" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', margin: 0, flex: 1 }}>
+                  <div className="stat-box">
+                    <div className="stat-val">{Number(results.total_works).toLocaleString()}</div>
+                    <div className="stat-lbl">Total funded works {savedYF}–{savedYT}<br /><small style={{ color: '#334155' }}>No double counting</small></div>
+                  </div>
+                  <div className="stat-box"><div className="stat-val">{basket.length}</div><div className="stat-lbl">Funders</div></div>
                 </div>
-                <div className="stat-box"><div className="stat-val">{basket.length}</div><div className="stat-lbl">Funders</div></div>
+                {results.bytes_processed != null && (
+                  <div style={{ alignSelf: 'flex-end', paddingBottom: '.25rem' }}>
+                    <BytesTag bytes={results.bytes_processed} />
+                  </div>
+                )}
               </div>
-              <div style={{ marginTop: '1.5rem' }}>
-                <div className="section-title">Top institutions receiving funding from this basket</div>
-                <div className="table-wrap">
-                  <table>
-                    <thead><tr>
-                      <th>#</th>
-                      {STh(instTable, 'name', 'Institution')}
-                      {STh(instTable, 'type', 'Type')}
-                      {STh(instTable, 'country', 'Country')}
-                      {STh(instTable, 'works_count', 'Works')}
-                    </tr></thead>
-                    <tbody>
-                      {instTable.visibleRows.map((inst, i) => (
-                        <tr key={i}>
-                          <td className="rank">{i + 1}</td><td>{inst.name}</td>
-                          <td>{inst.type ? <span className="badge-type">{inst.type}</span> : '—'}</td>
-                          <td>{inst.country ? <span className="badge-country">{inst.country}</span> : '—'}</td>
-                          <td className="works">{Number(inst.works_count).toLocaleString()}</td>
-                        </tr>
-                      ))}
-                      {!instTable.visibleRows.length && <tr><td colSpan="5" className="status">None found.</td></tr>}
-                    </tbody>
-                  </table>
+
+              {/* Institutions + optional Collaborators side by side */}
+              <div className={results.collaborators?.length > 0 ? 'results-grid' : undefined} style={results.collaborators?.length === 0 ? { marginTop: '1.5rem' } : { marginTop: '1.5rem' }}>
+                <div>
+                  <div className="section-title">Top institutions receiving funding from this basket</div>
+                  <div className="table-wrap">
+                    <table>
+                      <thead><tr>
+                        <th>#</th>
+                        {STh(instTable, 'name', 'Institution')}
+                        {STh(instTable, 'type', 'Type')}
+                        {STh(instTable, 'country', 'Country')}
+                        {STh(instTable, 'works_count', 'Works')}
+                      </tr></thead>
+                      <tbody>
+                        {instTable.visibleRows.map((inst, i) => (
+                          <tr key={i}>
+                            <td className="rank">{i + 1}</td><td>{inst.name}</td>
+                            <td>{inst.type ? <span className="badge-type">{inst.type}</span> : '—'}</td>
+                            <td>{inst.country ? <span className="badge-country">{inst.country}</span> : '—'}</td>
+                            <td className="works">{Number(inst.works_count).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                        {!instTable.visibleRows.length && <tr><td colSpan="5" className="status">None found.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+
+                {results.collaborators?.length > 0 && (
+                  <div>
+                    <div className="section-title">Top co-authoring institutions</div>
+                    <div className="table-wrap">
+                      <table>
+                        <thead><tr>
+                          <th>#</th>
+                          {STh(collabTable, 'name', 'Institution')}
+                          {STh(collabTable, 'country', 'Country')}
+                          {STh(collabTable, 'works_count', 'Co-authored')}
+                        </tr></thead>
+                        <tbody>
+                          {collabTable.visibleRows.map((c, i) => (
+                            <tr key={i}>
+                              <td className="rank">{i + 1}</td><td>{c.name}</td>
+                              <td>{c.country ? <span className="badge-country">{c.country}</span> : '—'}</td>
+                              <td className="works">{Number(c.works_count).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                          {!collabTable.visibleRows.length && <tr><td colSpan="4" className="status">None found.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}

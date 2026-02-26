@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import useTable from './useTable';
 import { apiFetch } from '../api';
+import { BytesTag } from '../bytesInfo';
 
 export default function InstBasket({ basket, removeFromBasket, basketData, setBasketData }) {
   const { results, yearFrom: savedYF, yearTo: savedYT } = basketData;
@@ -61,13 +62,20 @@ export default function InstBasket({ basket, removeFromBasket, basketData, setBa
           {error && <div className="status" style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
           {results && (
             <>
-              <div className="cards" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))' }}>
-                <div className="stat-box">
-                  <div className="stat-val">{Number(results.total_works).toLocaleString()}</div>
-                  <div className="stat-frac">({Number(results.total_fractional).toLocaleString(undefined, { maximumFractionDigits: 1 })} frac.)</div>
-                  <div className="stat-lbl">Total works {savedYF}–{savedYT}<br /><small style={{ color: '#334155' }}>No double counting</small></div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
+                <div className="cards" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', margin: 0, flex: 1 }}>
+                  <div className="stat-box">
+                    <div className="stat-val">{Number(results.total_works).toLocaleString()}</div>
+                    <div className="stat-frac">({Number(results.total_fractional).toLocaleString(undefined, { maximumFractionDigits: 1 })} frac.)</div>
+                    <div className="stat-lbl">Total works {savedYF}–{savedYT}<br /><small style={{ color: '#334155' }}>No double counting</small></div>
+                  </div>
+                  <div className="stat-box"><div className="stat-val">{basket.length}</div><div className="stat-lbl">Institutions</div></div>
                 </div>
-                <div className="stat-box"><div className="stat-val">{basket.length}</div><div className="stat-lbl">Institutions</div></div>
+                {results.bytes_processed != null && (
+                  <div style={{ alignSelf: 'flex-end', paddingBottom: '.25rem' }}>
+                    <BytesTag bytes={results.bytes_processed} />
+                  </div>
+                )}
               </div>
               <div className="results-grid">
                 <div>

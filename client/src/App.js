@@ -7,13 +7,35 @@ import FunderBasket from './pages/FunderBasket';
 import LoginGate from './pages/LoginGate';
 import ErrorPage from './pages/ErrorPage';
 
+function loadBasket(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || []; }
+  catch { return []; }
+}
+
+function saveBasket(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
 export default function App() {
-  const [authState, setAuthState]   = useState(null);
-  const [page, setPage]             = useState('overview');
-  const [instBasket,   setInstBasket]   = useState([]);
-  const [funderBasket, setFunderBasket] = useState([]);
-  const [instData,       setInstData]       = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
-  const [funderData,     setFunderData]     = useState({ rows: [], yearFrom: 2020, yearTo: 2025 });
+  const [authState, setAuthState] = useState(null);
+  const [page, setPage]           = useState('overview');
+
+  const [instBasket,   setInstBasketRaw]   = useState(() => loadBasket('orion_instBasket'));
+  const [funderBasket, setFunderBasketRaw] = useState(() => loadBasket('orion_funderBasket'));
+
+  const setInstBasket = val => {
+    const next = typeof val === 'function' ? val(instBasket) : val;
+    setInstBasketRaw(next);
+    saveBasket('orion_instBasket', next);
+  };
+  const setFunderBasket = val => {
+    const next = typeof val === 'function' ? val(funderBasket) : val;
+    setFunderBasketRaw(next);
+    saveBasket('orion_funderBasket', next);
+  };
+
+  const [instData,         setInstData]         = useState({ rows: [], yearFrom: 2020, yearTo: 2025, bytesProcessed: null });
+  const [funderData,       setFunderData]       = useState({ rows: [], yearFrom: 2020, yearTo: 2025, bytesProcessed: null });
   const [instBasketData,   setInstBasketData]   = useState({ results: null, yearFrom: 2020, yearTo: 2025 });
   const [funderBasketData, setFunderBasketData] = useState({ results: null, yearFrom: 2020, yearTo: 2025 });
 

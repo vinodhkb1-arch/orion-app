@@ -11,6 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List
 
+import httpx
+
 from google.cloud import bigquery
 from google_auth_oauthlib.flow import Flow
 from dotenv import load_dotenv
@@ -107,7 +109,12 @@ def get_bq(project_id: str) -> bigquery.Client:
     """Return a BQ client that bills jobs to the user's project."""
     return bigquery.Client(project=project_id)
 
-def run_query(sql: str, params: dict, project_id: str) -> list[dict]:
+def run_query(sql: str, params: dict, project_id: str) -> tuple[list[dict], int]:
+    """Execute a parameterised BigQuery query.
+
+    Returns a tuple of (rows, bytes_processed) where bytes_processed is the
+    total bytes billed for the job (useful for surfacing cost info to users).
+    """
     bq = get_bq(project_id)
     bq_params = []
     for name, value in params.items():
@@ -119,8 +126,9 @@ def run_query(sql: str, params: dict, project_id: str) -> list[dict]:
             bq_params.append(bigquery.ScalarQueryParameter(name, "STRING", value))
     job_config = bigquery.QueryJobConfig(query_parameters=bq_params)
     job = bq.query(sql, job_config=job_config, location="EU")
+    rows_iter = job.result()
     result = []
-    for row in job.result():
+    for row in rows_iter:
         d = {}
         for key, value in row.items():
             if value is None:
@@ -136,7 +144,8 @@ def run_query(sql: str, params: dict, project_id: str) -> list[dict]:
             else:
                 d[key] = value
         result.append(d)
-    return result
+    bytes_processed = job.total_bytes_processed or 0
+    return result, bytes_processed
 
 def cached(data, max_age: str = CACHE_1H):
     return JSONResponse(content=data, headers={"Cache-Control": max_age})
@@ -168,7 +177,6 @@ def auth_callback(request: Request, code: str = Query(...), state: str = Query(.
     except Exception:
         return RedirectResponse("/?error=token_exchange_failed")
 
-    import httpx
     try:
         resp = httpx.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
@@ -235,7 +243,8 @@ def institutions_top(
         ORDER BY works_count DESC
         LIMIT @limit
     """
-    return cached(run_query(sql, {"limit": limit, "year_from": year_from, "year_to": year_to}, session["project_id"]))
+    rows, bp = run_query(sql, {"limit": limit, "year_from": year_from, "year_to": year_to}, session["project_id"])
+    return cached({"rows": rows, "bytes_processed": bp})
 
 @app.get("/api/institutions/search")
 def institutions_search(
@@ -248,7 +257,7 @@ def institutions_search(
 ):
     session = require_auth(request)
     if not q.strip():
-        return cached([])
+        return cached({"rows": [], "bytes_processed": 0})
     field_map = {"name": "i.institution", "country": "i.country_iso_alpha2_code", "type": "it.institution_type"}
     col = field_map.get(field, "i.institution")
     sql = f"""
@@ -270,10 +279,12 @@ def institutions_search(
         ORDER BY works_count DESC
         LIMIT @limit
     """
-    return cached(run_query(sql, {"pattern": f"%{q.lower()}%", "limit": limit, "year_from": year_from, "year_to": year_to}, session["project_id"]))
+    rows, bp = run_query(sql, {"pattern": f"%{q.lower()}%", "limit": limit, "year_from": year_from, "year_to": year_to}, session["project_id"])
+    return cached({"rows": rows, "bytes_processed": bp})
 
 @app.get("/api/institutions/{institution_id}/trends")
 def institution_trends(request: Request, institution_id: int):
+    """Return year-by-year works and fractional counts for one institution."""
     session = require_auth(request)
     sql = f"""
         SELECT wc.pub_year AS year, wc.works_count,
@@ -284,7 +295,8 @@ def institution_trends(request: Request, institution_id: int):
         WHERE wc.institution_id = @id
         ORDER BY year
     """
-    return cached(run_query(sql, {"id": institution_id}, session["project_id"]))
+    rows, bp = run_query(sql, {"id": institution_id}, session["project_id"])
+    return cached({"rows": rows, "bytes_processed": bp})
 
 # ── Funders ───────────────────────────────────────────────────────────────────
 
@@ -308,7 +320,8 @@ def funders_top(
         ORDER BY works_count DESC
         LIMIT @limit
     """
-    return cached(run_query(sql, {"limit": limit, "year_from": year_from, "year_to": year_to}, session["project_id"]))
+    rows, bp = run_query(sql, {"limit": limit, "year_from": year_from, "year_to": year_to}, session["project_id"])
+    return cached({"rows": rows, "bytes_processed": bp})
 
 @app.get("/api/funders/search")
 def funders_search(
@@ -321,7 +334,7 @@ def funders_search(
 ):
     session = require_auth(request)
     if not q.strip():
-        return cached([])
+        return cached({"rows": [], "bytes_processed": 0})
     field_map = {"name": "f.funder", "country": "f.country_iso_alpha2_code", "description": "f.description"}
     col = field_map.get(field, "f.funder")
     sql = f"""
@@ -337,10 +350,12 @@ def funders_search(
         ORDER BY works_count DESC
         LIMIT @limit
     """
-    return cached(run_query(sql, {"pattern": f"%{q.lower()}%", "limit": limit, "year_from": year_from, "year_to": year_to}, session["project_id"]))
+    rows, bp = run_query(sql, {"pattern": f"%{q.lower()}%", "limit": limit, "year_from": year_from, "year_to": year_to}, session["project_id"])
+    return cached({"rows": rows, "bytes_processed": bp})
 
 @app.get("/api/funders/{funder_id}/trends")
 def funder_trends(request: Request, funder_id: int):
+    """Return year-by-year funded work counts for one funder."""
     session = require_auth(request)
     sql = f"""
         SELECT w.pub_year AS year, COUNT(DISTINCT wg.work_id) AS works
@@ -349,7 +364,8 @@ def funder_trends(request: Request, funder_id: int):
         WHERE wg.funder_id = @id
         GROUP BY year ORDER BY year
     """
-    return cached(run_query(sql, {"id": funder_id}, session["project_id"]))
+    rows, bp = run_query(sql, {"id": funder_id}, session["project_id"])
+    return cached({"rows": rows, "bytes_processed": bp})
 
 # ── Institution Basket ────────────────────────────────────────────────────────
 
@@ -368,7 +384,7 @@ def basket_institutions_analyze(req: InstBasketRequest, request: Request):
 
     yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.institution_ids
 
-    total_works = run_query(f"""
+    total_works_rows, bp1 = run_query(f"""
         SELECT COUNT(DISTINCT wai.work_id) AS total_works
         FROM `{SOURCE}.work_affiliation_institution` wai
         JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
@@ -376,14 +392,14 @@ def basket_institutions_analyze(req: InstBasketRequest, request: Request):
           AND w.pub_year BETWEEN @year_from AND @year_to
     """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
 
-    total_frac = run_query(f"""
+    total_frac_rows, bp2 = run_query(f"""
         SELECT COALESCE(SUM(fractional_count), 0) AS total_fractional
         FROM `{BQ_CACHE}.orion_fractional_counts`
         WHERE institution_id IN UNNEST(@ids)
           AND pub_year BETWEEN @year_from AND @year_to
     """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
 
-    funders = run_query(f"""
+    funders, bp3 = run_query(f"""
         SELECT f.funder_id, f.funder AS name, f.country_iso_alpha2_code AS country,
                COUNT(DISTINCT wg.work_id) AS works_count
         FROM `{SOURCE}.work_affiliation_institution` wai
@@ -396,7 +412,7 @@ def basket_institutions_analyze(req: InstBasketRequest, request: Request):
         ORDER BY works_count DESC LIMIT @limit
     """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
 
-    collaborators = run_query(f"""
+    collaborators, bp4 = run_query(f"""
         SELECT i.institution_id, i.institution AS name, i.country_iso_alpha2_code AS country,
                COUNT(DISTINCT wai2.work_id) AS works_count
         FROM `{SOURCE}.work_affiliation_institution` wai
@@ -412,10 +428,11 @@ def basket_institutions_analyze(req: InstBasketRequest, request: Request):
     """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
 
     return cached({
-        "total_works": total_works[0]["total_works"] if total_works else 0,
-        "total_fractional": round(float(total_frac[0]["total_fractional"]) if total_frac else 0, 1),
+        "total_works": total_works_rows[0]["total_works"] if total_works_rows else 0,
+        "total_fractional": round(float(total_frac_rows[0]["total_fractional"]) if total_frac_rows else 0, 1),
         "funders": funders,
         "collaborators": collaborators,
+        "bytes_processed": bp1 + bp2 + bp3 + bp4,
     }, CACHE_OFF)
 
 # ── Funder Basket ─────────────────────────────────────────────────────────────
@@ -425,17 +442,19 @@ class FunderBasketRequest(BaseModel):
     year_from: int = 2000
     year_to: int = 2025
     limit: int = 50
+    include_collaborators: bool = False
 
 @app.post("/api/basket/funders/analyze")
 def basket_funders_analyze(req: FunderBasketRequest, request: Request):
+    """Analyze a basket of funders: total funded works, top institutions, and optionally co-authoring institutions."""
     session = require_auth(request)
     pid = session["project_id"]
     if not req.funder_ids:
-        return cached({"total_works": 0, "institutions": []}, CACHE_OFF)
+        return cached({"total_works": 0, "institutions": [], "collaborators": [], "bytes_processed": 0}, CACHE_OFF)
 
     yf, yt, lim, ids = req.year_from, req.year_to, req.limit, req.funder_ids
 
-    total_works = run_query(f"""
+    total_works_rows, bp1 = run_query(f"""
         SELECT COUNT(DISTINCT wg.work_id) AS total_works
         FROM `{SOURCE}.work_grant` wg
         JOIN `{SOURCE}.work` w ON wg.work_id = w.work_id
@@ -443,7 +462,7 @@ def basket_funders_analyze(req: FunderBasketRequest, request: Request):
           AND w.pub_year BETWEEN @year_from AND @year_to
     """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
 
-    institutions = run_query(f"""
+    institutions, bp2 = run_query(f"""
         SELECT i.institution_id, i.institution AS name, i.country_iso_alpha2_code AS country,
                it.institution_type AS type, COUNT(DISTINCT wai.work_id) AS works_count
         FROM `{SOURCE}.work_grant` wg
@@ -457,9 +476,32 @@ def basket_funders_analyze(req: FunderBasketRequest, request: Request):
         ORDER BY works_count DESC LIMIT @limit
     """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
 
+    collaborators = []
+    bp3 = 0
+    if req.include_collaborators:
+        collaborators, bp3 = run_query(f"""
+            SELECT i.institution_id, i.institution AS name, i.country_iso_alpha2_code AS country,
+                   COUNT(DISTINCT wai2.work_id) AS works_count
+            FROM `{SOURCE}.work_grant` wg
+            JOIN `{SOURCE}.work` w ON wg.work_id = w.work_id
+            JOIN `{SOURCE}.work_affiliation_institution` wai ON w.work_id = wai.work_id
+            JOIN `{SOURCE}.work_affiliation_institution` wai2
+                ON wai.work_id = wai2.work_id
+            JOIN `{SOURCE}.institution` i ON wai2.institution_id = i.institution_id
+            LEFT JOIN `{SOURCE}.work_grant` wg2
+                ON wai2.work_id = wg2.work_id AND wg2.funder_id IN UNNEST(@ids)
+            WHERE wg.funder_id IN UNNEST(@ids)
+              AND w.pub_year BETWEEN @year_from AND @year_to
+              AND wg2.work_id IS NULL
+            GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code
+            ORDER BY works_count DESC LIMIT @limit
+        """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
+
     return cached({
-        "total_works": total_works[0]["total_works"] if total_works else 0,
+        "total_works": total_works_rows[0]["total_works"] if total_works_rows else 0,
         "institutions": institutions,
+        "collaborators": collaborators,
+        "bytes_processed": bp1 + bp2 + bp3,
     }, CACHE_OFF)
 
 # ── Frontend ──────────────────────────────────────────────────────────────────
