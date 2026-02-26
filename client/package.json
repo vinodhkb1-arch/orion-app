@@ -9,6 +9,14 @@
     "recharts": "^2.10.3"
   },
   "scripts": { "build": "react-scripts build" },
+  "eslintConfig": {
+    "extends": ["react-app"],
+    "plugins": ["react-hooks"],
+    "rules": {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn"
+    }
+  },
   "proxy": "http://localhost:8080",
   "browserslist": { "production": [">0.2%"] }
 }
