@@ -17,6 +17,7 @@ import React, { useState } from 'react';
 import useTable from './useTable';
 import { apiFetch, exportCsv } from '../api';
 import { BytesTag } from '../bytesInfo';
+import { PermissionError } from './BasketShared';
 
 export default function EntityList({
   entityData,
@@ -31,18 +32,20 @@ export default function EntityList({
   csvName,
   renderHeaders,
   renderRow,
+  projectId,
 }) {
   const { rows, yearFrom: fetchedYF, yearTo: fetchedYT, bytesProcessed } = entityData;
-  const [loading, setLoading] = useState(false);
-  const [q,       setQ]       = useState('');
-  const [field,   setField]   = useState(fields[0].value);
-  const [yearFrom, setYF]     = useState(fetchedYF);
-  const [yearTo,   setYT]     = useState(fetchedYT);
+  const [loading, setLoading]         = useState(false);
+  const [q,       setQ]               = useState('');
+  const [field,   setField]           = useState(fields[0].value);
+  const [yearFrom, setYF]             = useState(fetchedYF);
+  const [yearTo,   setYT]             = useState(fetchedYT);
+  const [permissionError, setPermErr] = useState(false);
 
   const { visibleRows, onSort, sortIcon, sortKey } = useTable(rows, 1000);
 
   const fetchData = (yf, yt, sq, sf) => {
-    setLoading(true);
+    setLoading(true); setPermErr(false);
     const url = sq.trim()
       ? `${apiSearch}?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=1000`
       : `${apiTop}?year_from=${yf}&year_to=${yt}&limit=1000`;
@@ -50,7 +53,10 @@ export default function EntityList({
       .then(d => {
         setEntityData({ rows: d?.rows ?? [], yearFrom: yf, yearTo: yt, bytesProcessed: d?.bytes_processed ?? null });
       })
-      .catch(() => {
+      .catch(e => {
+        if (e.message === '403' || e.message?.startsWith('Permission denied')) {
+          setPermErr(true);
+        }
         setEntityData({ rows: [], yearFrom: yf, yearTo: yt, bytesProcessed: null });
       })
       .finally(() => setLoading(false));
@@ -105,6 +111,7 @@ export default function EntityList({
         </div>
       )}
 
+      {permissionError && <PermissionError projectId={projectId} />}
       {loading && <div className="status">Loading…</div>}
       {!loading && rows.length === 0 && (
         <div className="status">Use the controls above and click Search to load data.</div>

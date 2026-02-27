@@ -210,3 +210,69 @@ export function ResultTable({ rows, type, addToBasket, loading }) {
     </div>
   );
 }
+
+const SA = '112226578999-compute@developer.gserviceaccount.com';
+
+/**
+ * Shown when a query returns a 403 — guides the user through fixing their
+ * IAM / BigQuery API setup without leaving the page.
+ */
+export function PermissionError({ projectId }) {
+  const iamUrl = projectId
+    ? `https://console.cloud.google.com/iam-admin/iam?project=${projectId}`
+    : 'https://console.cloud.google.com/iam-admin/iam';
+  const bqUrl = projectId
+    ? `https://console.cloud.google.com/apis/library/bigquery.googleapis.com?project=${projectId}`
+    : 'https://console.cloud.google.com/apis/library/bigquery.googleapis.com';
+
+  return (
+    <div style={{ background: '#2d1515', border: '1px solid #7f1d1d', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.75rem' }}>
+        <span style={{ fontSize: '1rem' }}>🔒</span>
+        <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#fca5a5' }}>
+          Permission error — your project needs a one-time setup
+        </span>
+      </div>
+      <p style={{ fontSize: '.8rem', color: '#f87171', lineHeight: 1.7, marginBottom: '1rem' }}>
+        ORION couldn't run a query on project{' '}
+        {projectId ? <strong style={{ color: '#fca5a5' }}>{projectId}</strong> : 'your project'}.
+        Complete the two steps below, then try again.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+        <div style={{ background: '#1a0a0a', border: '1px solid #7f1d1d', borderRadius: '8px', padding: '.85rem 1rem' }}>
+          <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#fca5a5', marginBottom: '.35rem' }}>
+            Step 1 — Enable the BigQuery API
+          </div>
+          <a href={bqUrl} target="_blank" rel="noreferrer" style={{ fontSize: '.78rem', color: '#93c5fd' }}>
+            Enable BigQuery API{projectId ? ` on ${projectId}` : ''} ↗
+          </a>
+        </div>
+
+        <div style={{ background: '#1a0a0a', border: '1px solid #7f1d1d', borderRadius: '8px', padding: '.85rem 1rem' }}>
+          <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#fca5a5', marginBottom: '.35rem' }}>
+            Step 2 — Grant BigQuery Job User role
+          </div>
+          <p style={{ fontSize: '.78rem', color: '#f87171', lineHeight: 1.6, margin: '0 0 .5rem' }}>
+            Open <a href={iamUrl} target="_blank" rel="noreferrer" style={{ color: '#93c5fd' }}>
+              IAM for your project ↗
+            </a>, click <strong style={{ color: '#fca5a5' }}>Grant Access</strong>, and add:
+          </p>
+          <div style={{ background: '#0f0505', borderRadius: '6px', padding: '.6rem .85rem', marginBottom: '.3rem' }}>
+            <div style={{ fontSize: '.72rem', color: '#7f1d1d', marginBottom: '.2rem' }}>New principal:</div>
+            <code style={{ color: '#f9a8d4', fontSize: '.77rem', userSelect: 'all', wordBreak: 'break-all' }}>{SA}</code>
+          </div>
+          <div style={{ background: '#0f0505', borderRadius: '6px', padding: '.6rem .85rem' }}>
+            <div style={{ fontSize: '.72rem', color: '#7f1d1d', marginBottom: '.2rem' }}>Role:</div>
+            <code style={{ color: '#86efac', fontSize: '.77rem' }}>BigQuery Job User</code>
+          </div>
+        </div>
+      </div>
+
+      <p style={{ fontSize: '.72rem', color: '#7f1d1d', lineHeight: 1.6, marginTop: '.75rem', marginBottom: 0 }}>
+        After saving, wait a few seconds and try your search again.
+        This is a one-time setup — you won't need to repeat it.
+      </p>
+    </div>
+  );
+}

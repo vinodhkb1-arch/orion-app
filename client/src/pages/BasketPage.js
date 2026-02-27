@@ -13,7 +13,7 @@
 import React, { useState } from 'react';
 import { apiFetch, openVosViewer } from '../api';
 import { BytesTag } from '../bytesInfo';
-import { QueryModal, ResultTable } from './BasketShared';
+import { QueryModal, ResultTable, PermissionError } from './BasketShared';
 
 export default function BasketPage({
   basket,
@@ -23,6 +23,7 @@ export default function BasketPage({
   addInstToBasket,
   addFunderToBasket,
   setPage,
+  projectId,
   // config
   type,
   idKey,
@@ -49,7 +50,8 @@ export default function BasketPage({
   const [coInstQuery, setCoInstQuery] = useState(false);
   const [coFundQuery, setCoFundQuery] = useState(false);
 
-  const [error, setError] = useState('');
+  const [error, setError]               = useState('');
+  const [permissionError, setPermError] = useState(false);
 
   // Persist results + the year range that was actually used, so labels stay in sync.
   const setWorksResult  = (r, yf, yt) => setBasketData(d => ({ ...d, worksResult: r,  worksYF: yf,  worksYT: yt  }));
@@ -75,30 +77,38 @@ export default function BasketPage({
     body: body(yf, yt),
   });
 
+  const handleError = (e) => {
+    if (e.message === '403' || e.message?.startsWith('Permission denied')) {
+      setPermError(true);
+    } else {
+      setError(e.message);
+    }
+  };
+
   const getWorks = () => {
     const yf = yearFrom, yt = yearTo;
-    setWorksLoading(true); setError('');
+    setWorksLoading(true); setError(''); setPermError(false);
     apiFetch(`${apiBase}/works`, postOpts(yf, yt))
       .then(d => { if (d) setWorksResult(d, yf, yt); })
-      .catch(e => setError(e.message))
+      .catch(handleError)
       .finally(() => setWorksLoading(false));
   };
 
   const getCoInst = () => {
     const yf = yearFrom, yt = yearTo;
-    setCoInstLoading(true); setError('');
+    setCoInstLoading(true); setError(''); setPermError(false);
     apiFetch(`${apiBase}/co-institutions`, postOpts(yf, yt))
       .then(d => { if (d) setCoInstResult(d, yf, yt); })
-      .catch(e => setError(e.message))
+      .catch(handleError)
       .finally(() => setCoInstLoading(false));
   };
 
   const getCoFund = () => {
     const yf = yearFrom, yt = yearTo;
-    setCoFundLoading(true); setError('');
+    setCoFundLoading(true); setError(''); setPermError(false);
     apiFetch(`${apiBase}/co-funders`, postOpts(yf, yt))
       .then(d => { if (d) setCoFundResult(d, yf, yt); })
-      .catch(e => setError(e.message))
+      .catch(handleError)
       .finally(() => setCoFundLoading(false));
   };
 
@@ -174,6 +184,7 @@ export default function BasketPage({
             {actionBtn('Get co-occurring funders',      getCoFund, coFundLoading)}
           </div>
 
+          {permissionError && <PermissionError projectId={projectId} />}
           {error && <div className="status" style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
 
           {/* VOSviewer network section */}
