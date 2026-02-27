@@ -122,7 +122,11 @@ def run_query(sql: str, params: dict, project_id: str) -> tuple[list[dict], int]
 
     Returns a tuple of (rows, bytes_processed) where bytes_processed is the
     total bytes billed for the job (useful for surfacing cost info to users).
+
+    Raises HTTPException with a user-friendly message for common permission
+    errors (missing BigQuery Job User role, API not enabled, etc.).
     """
+    from google.api_core.exceptions import Forbidden, PermissionDenied, ServiceUnavailable
     bq = get_bq(project_id)
     bq_params = []
     for name, value in params.items():
@@ -133,8 +137,23 @@ def run_query(sql: str, params: dict, project_id: str) -> tuple[list[dict], int]
         else:
             bq_params.append(bigquery.ScalarQueryParameter(name, "STRING", value))
     job_config = bigquery.QueryJobConfig(query_parameters=bq_params)
-    job = bq.query(sql, job_config=job_config, location="EU")
-    rows_iter = job.result()
+    try:
+        job = bq.query(sql, job_config=job_config, location="EU")
+        rows_iter = job.result()
+    except (Forbidden, PermissionDenied) as e:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Permission denied on project '{project_id}'. "
+                "Please grant the ORION service account "
+                "(112226578999-compute@developer.gserviceaccount.com) "
+                "the 'BigQuery Job User' role in your GCP project IAM settings, "
+                "and make sure the BigQuery API is enabled. "
+                f"Details: {str(e)[:200]}"
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)[:300]}")
     result = []
     for row in rows_iter:
         d = {}

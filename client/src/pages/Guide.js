@@ -90,6 +90,52 @@ export default function Guide() {
         How ORION works, how the data is structured, how networks are built, and how to go deeper with BigQuery.
       </p>
 
+      {/* ── GCP setup ────────────────────────────────────────────────── */}
+      <Section title="0 — One-time GCP setup (required for all users)">
+        <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: '1rem' }}>
+          ORION runs BigQuery queries on your behalf using a shared service account, billing the cost
+          to your GCP project. Before your first use, you need to grant that service account permission
+          to submit jobs in your project. This is a one-time step.
+        </p>
+
+        <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
+          <Step n="1">
+            <strong style={{ color: '#e2e8f0' }}>Enable the BigQuery API</strong> in your project if you haven't already:{' '}
+            <a href="https://console.cloud.google.com/apis/library/bigquery.googleapis.com" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>
+              Enable BigQuery API ↗
+            </a>
+          </Step>
+          <Step n="2">
+            Open <a href="https://console.cloud.google.com/iam-admin/iam" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>IAM & Admin → IAM ↗</a> for your project,
+            then click <strong style={{ color: '#e2e8f0' }}>Grant Access</strong>.
+          </Step>
+          <Step n="3">
+            <span>Add the following principal and role:</span>
+            <div style={{ background: '#0f1117', border: '1px solid #2d3148', borderRadius: '6px', padding: '.75rem 1rem', marginTop: '.5rem' }}>
+              <div style={{ marginBottom: '.4rem' }}>
+                <span style={{ fontSize: '.75rem', color: '#475569' }}>New principal:</span>
+                <br />
+                <code style={{ color: '#a78bfa', fontSize: '.8rem', userSelect: 'all' }}>112226578999-compute@developer.gserviceaccount.com</code>
+              </div>
+              <div>
+                <span style={{ fontSize: '.75rem', color: '#475569' }}>Role:</span>
+                <br />
+                <code style={{ color: '#4ade80', fontSize: '.8rem' }}>BigQuery Job User</code>
+              </div>
+            </div>
+          </Step>
+          <Step n="4">
+            Click <strong style={{ color: '#e2e8f0' }}>Save</strong>. You're done — go back to the basket and try again.
+          </Step>
+        </div>
+
+        <Note>
+          <strong>What this grants:</strong> the service account can submit BigQuery jobs billed to your project.
+          It does <strong>not</strong> get access to any data stored in your project — only the ability to run queries
+          against public datasets like <code>cwts-leiden.openalex_2025aug</code>.
+        </Note>
+      </Section>
+
       {/* ── Data model ───────────────────────────────────────────────── */}
       <Section title="1 — How the data is structured">
         <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: '1rem' }}>
