@@ -8,6 +8,7 @@
  *   queryBuilders { works, coInst, coFund } — SQL export builders from BasketShared
  *   title         Page heading
  *   emptyHint     Message shown when basket is empty
+ *   setPage       App-level page setter (for Guide link)
  */
 import React, { useState } from 'react';
 import { apiFetch, openVosViewer } from '../api';
@@ -21,6 +22,7 @@ export default function BasketPage({
   setBasketData,
   addInstToBasket,
   addFunderToBasket,
+  setPage,
   // config
   type,
   idKey,
@@ -38,6 +40,10 @@ export default function BasketPage({
   const [coFundLoading, setCoFundLoading] = useState(false);
   const [vosLoading,    setVosLoading]    = useState(false);
   const [vosError,      setVosError]      = useState('');
+
+  // VOSviewer network options
+  const [vosLimit,    setVosLimit]    = useState(100);
+  const [vosAllWorks, setVosAllWorks] = useState(false);
 
   const [worksQuery,  setWorksQuery]  = useState(false);
   const [coInstQuery, setCoInstQuery] = useState(false);
@@ -101,7 +107,13 @@ export default function BasketPage({
     const idField = type === 'institutions' ? 'institution_ids' : 'funder_ids';
     const buildUrl = `/api/vos/build/${type}`;
     setVosLoading(true); setVosError('');
-    openVosViewer(buildUrl, { [idField]: ids, year_from: yf, year_to: yt, limit: 200 })
+    openVosViewer(buildUrl, {
+      [idField]: ids,
+      year_from: yf,
+      year_to: yt,
+      limit: vosLimit,
+      all_works: vosAllWorks,
+    })
       .catch(e => setVosError(e.message))
       .finally(() => setVosLoading(false));
   };
@@ -109,6 +121,8 @@ export default function BasketPage({
   // Read back the year range that was actually used for each result.
   const wYF = basketData.worksYF  ?? yearFrom;
   const wYT = basketData.worksYT  ?? yearTo;
+
+  const entityLabel = type === 'institutions' ? 'institution' : 'funder';
 
   const actionBtn = (label, onClick, loading) => (
     <button
@@ -160,25 +174,103 @@ export default function BasketPage({
             {actionBtn('Get co-occurring funders',      getCoFund, coFundLoading)}
           </div>
 
-          {/* VOSviewer network button */}
-          <div style={{ marginBottom: '1.5rem' }}>
+          {error && <div className="status" style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
+
+          {/* VOSviewer network section */}
+          <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '1rem' }}>
+              <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#94a3b8' }}>🔵 Co-occurrence network</span>
+              {setPage && (
+                <button
+                  onClick={() => setPage('guide')}
+                  style={{ background: 'none', border: 'none', color: '#475569', fontSize: '.72rem', cursor: 'pointer', textDecoration: 'underline', padding: 0, marginLeft: 'auto' }}
+                >
+                  How does this work? → Guide
+                </button>
+              )}
+            </div>
+
+            {/* Network explanation */}
+            <p style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.65, marginBottom: '1rem' }}>
+              The network shows your <strong style={{ color: '#64748b' }}>basket {type}</strong> (cluster 1)
+              and their top co-occurring {type} (cluster 2).
+              Node size = works. Edge thickness = shared works between each pair.
+            </p>
+
+            {/* Network options */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+
+              {/* Option 1: node count */}
+              <div>
+                <label style={{ display: 'block', fontSize: '.75rem', color: '#64748b', marginBottom: '.35rem' }}>
+                  {type === 'institutions' ? 'Institutions' : 'Funders'} in the map
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                  <span style={{ fontSize: '.78rem', color: '#475569' }}>Top</span>
+                  <input
+                    type="number"
+                    value={vosLimit}
+                    min={10} max={500}
+                    onChange={e => setVosLimit(Math.max(10, Math.min(500, Number(e.target.value))))}
+                    style={{ width: '64px', background: '#0f1117', border: '1px solid #2d3148', borderRadius: '6px', color: '#e2e8f0', padding: '.4rem .6rem', fontSize: '.85rem', outline: 'none' }}
+                  />
+                  <span style={{ fontSize: '.78rem', color: '#475569' }}>co-occurring {type}</span>
+                </div>
+                <div style={{ fontSize: '.7rem', color: '#334155', marginTop: '.3rem' }}>
+                  Ranked by works count within the basket's work set.
+                </div>
+              </div>
+
+              {/* Option 2: works pool */}
+              <div>
+                <label style={{ display: 'block', fontSize: '.75rem', color: '#64748b', marginBottom: '.35rem' }}>
+                  Works used for node size and edges
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      checked={!vosAllWorks}
+                      onChange={() => setVosAllWorks(false)}
+                      style={{ marginTop: '2px', flexShrink: 0 }}
+                    />
+                    <span style={{ fontSize: '.78rem', color: !vosAllWorks ? '#e2e8f0' : '#475569', lineHeight: 1.5 }}>
+                      Works from basket {type} only
+                      <span style={{ display: 'block', fontSize: '.7rem', color: '#334155' }}>
+                        Counts only works that involve at least one basket {entityLabel}.
+                      </span>
+                    </span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      checked={vosAllWorks}
+                      onChange={() => setVosAllWorks(true)}
+                      style={{ marginTop: '2px', flexShrink: 0 }}
+                    />
+                    <span style={{ fontSize: '.78rem', color: vosAllWorks ? '#e2e8f0' : '#475569', lineHeight: 1.5 }}>
+                      Include works from co-occurring {type}
+                      <span style={{ display: 'block', fontSize: '.7rem', color: '#334155' }}>
+                        Counts all works among map {type}, not just those involving the basket.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <button
               className="btn"
               onClick={openVos}
               disabled={vosLoading}
-              style={{ background: '#1a5276', borderColor: '#2980b9', opacity: vosLoading ? .6 : 1 }}
+              style={{ background: '#1a3a5c', opacity: vosLoading ? .6 : 1 }}
             >
-              {vosLoading ? 'Building network…' : '🔵 Open co-occurrence network in VOSviewer'}
+              {vosLoading ? 'Building network…' : 'Open in VOSviewer Online'}
             </button>
             {vosError && (
               <span style={{ marginLeft: '1rem', fontSize: '.8rem', color: '#f87171' }}>{vosError}</span>
             )}
-            <div style={{ fontSize: '.72rem', color: '#334155', marginTop: '.35rem' }}>
-              Opens a co-occurrence network of {type} in VOSviewer Online. Uses year range above. Top 200 nodes by works count.
-            </div>
           </div>
-
-          {error && <div className="status" style={{ color: '#f87171', marginBottom: '1rem' }}>{error}</div>}
 
           {/* Works result */}
           {worksResult && worksResult.total_works > 0 && (

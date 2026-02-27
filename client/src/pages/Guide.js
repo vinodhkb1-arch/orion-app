@@ -54,6 +54,18 @@ function Note({ children }) {
   );
 }
 
+function InfoCard({ icon, title, body }) {
+  return (
+    <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', padding: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '.6rem' }}>
+        <span style={{ fontSize: '1.1rem' }}>{icon}</span>
+        <span style={{ fontSize: '.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.05em' }}>{title}</span>
+      </div>
+      <p style={{ fontSize: '.85rem', color: '#94a3b8', lineHeight: 1.65, margin: 0 }}>{body}</p>
+    </div>
+  );
+}
+
 const EXAMPLE_QUERY = `-- Step 1: paste your export query here as a CTE
 WITH my_works AS (
   -- (paste the query from the basket here)
@@ -75,12 +87,98 @@ export default function Guide() {
     <div className="page" style={{ maxWidth: '860px' }}>
       <h1>Guide</h1>
       <p style={{ color: '#64748b', marginBottom: '2.5rem', fontSize: '.925rem', lineHeight: 1.7 }}>
-        ORION lets you explore institutions and funders interactively. When you want to go deeper —
-        downloading the full list of papers behind a result — you can generate a BigQuery query and
-        run it yourself. This guide walks you through the whole process from scratch.
+        How ORION works, how the data is structured, how networks are built, and how to go deeper with BigQuery.
       </p>
 
-      <Section title="1 — What is a work ID?">
+      {/* ── Data model ───────────────────────────────────────────────── */}
+      <Section title="1 — How the data is structured">
+        <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: '1rem' }}>
+          ORION uses the <strong style={{ color: '#e2e8f0' }}>CWTS OpenAlex 2025 August snapshot</strong> — a curated
+          version of the <a href="https://openalex.org" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>OpenAlex</a> catalogue
+          published by <a href="https://www.cwts.nl" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>CWTS Leiden</a> as
+          part of the <a href="https://orion-dbs.community" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>ORION initiative</a>.
+          Everything is a BigQuery public dataset at <code style={{ color: '#a78bfa' }}>cwts-leiden.openalex_2025aug</code>.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+          <InfoCard
+            icon="🏛"
+            title="Works → Institutions"
+            body="The link is work → authorship → institution. An authorship is one author's contribution to a work, and the institution is assigned solely from the affiliation that author declared on that paper — not from any other known affiliations of the author."
+          />
+          <InfoCard
+            icon="💰"
+            title="Works → Funders"
+            body="The link is work → grant → funder. OpenAlex constructs this from funding acknowledgements in PDFs, Crossref/DataCite metadata, and direct funder data feeds. Coverage is uneven — especially for older papers — and the data is continuously updated."
+          />
+        </div>
+        <Note>
+          Works counts in ORION are <strong>distinct work counts</strong> — a work is never counted twice for the same institution or funder, even if multiple authors from the same institution contributed.
+        </Note>
+      </Section>
+
+      {/* ── VOSviewer networks ───────────────────────────────────────── */}
+      <Section title="2 — Co-occurrence networks in VOSviewer">
+        <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: '1rem' }}>
+          From any basket you can open a co-occurrence network in{' '}
+          <a href="https://app.vosviewer.com" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>VOSviewer Online</a>,
+          a free tool for interactive network visualisation developed by{' '}
+          <a href="https://www.cwts.nl" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>CWTS Leiden</a>.
+        </p>
+
+        <div style={{ fontSize: '.8rem', fontWeight: 700, color: '#64748b', marginBottom: '.5rem' }}>How the network is built</div>
+        <Step n="1">
+          <strong style={{ color: '#e2e8f0' }}>Node set:</strong> ORION starts from the works that involve your basket institutions or funders. It then finds all other institutions/funders that appear on those same works — these become the nodes. You control how many co-occurring nodes to include (default: top 100 by works count).
+        </Step>
+        <Step n="2">
+          <strong style={{ color: '#e2e8f0' }}>Node size:</strong> proportional to the number of works for that institution or funder, within the selected works pool.
+        </Step>
+        <Step n="3">
+          <strong style={{ color: '#e2e8f0' }}>Edges:</strong> for every pair of nodes, ORION counts how many works they share. This is the edge strength — the thicker the line between two nodes, the more works they have in common.
+        </Step>
+        <Step n="4">
+          <strong style={{ color: '#e2e8f0' }}>Colours:</strong> your basket institutions/funders appear in cluster 1 (one colour); co-occurring nodes appear in cluster 2 (another colour). Within each cluster, VOSviewer may further subdivide nodes based on their network structure.
+        </Step>
+
+        <div style={{ fontSize: '.8rem', fontWeight: 700, color: '#64748b', marginBottom: '.5rem', marginTop: '1.25rem' }}>Works pool options</div>
+        <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: '.5rem' }}>
+          The <strong style={{ color: '#e2e8f0' }}>works pool</strong> controls which works are used to calculate node sizes and edge strengths. There are two options:
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '.75rem' }}>
+          <div style={{ background: '#0f1117', border: '1px solid #2d3148', borderRadius: '8px', padding: '1rem' }}>
+            <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#7c8cff', marginBottom: '.4rem' }}>Basket works only (default)</div>
+            <p style={{ fontSize: '.78rem', color: '#64748b', lineHeight: 1.6, margin: 0 }}>
+              Only works that involve at least one basket institution/funder are counted. Node sizes and edge weights reflect the basket's view of the world — how active each co-occurring node is <em>in relation to your basket</em>.
+            </p>
+          </div>
+          <div style={{ background: '#0f1117', border: '1px solid #2d3148', borderRadius: '8px', padding: '1rem' }}>
+            <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#a78bfa', marginBottom: '.4rem' }}>Include co-occurring works</div>
+            <p style={{ fontSize: '.78rem', color: '#64748b', lineHeight: 1.6, margin: 0 }}>
+              All works among map nodes are counted, including works between co-occurring nodes that don't involve your basket. Node sizes become the nodes' overall output; edge weights reflect the full relationship between any two nodes in the map.
+            </p>
+          </div>
+        </div>
+        <Note>
+          The <strong>node set</strong> is always determined from basket works — only the counts used for sizes and edges change between the two options.
+        </Note>
+
+        <div style={{ fontSize: '.8rem', fontWeight: 700, color: '#64748b', marginBottom: '.5rem', marginTop: '1.25rem' }}>Using VOSviewer Online</div>
+        <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: '.5rem' }}>
+          Once the network opens in VOSviewer Online, you can:
+        </p>
+        <div style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 2 }}>
+          • <strong style={{ color: '#e2e8f0' }}>Zoom and pan</strong> — scroll to zoom, drag to pan<br/>
+          • <strong style={{ color: '#e2e8f0' }}>Click a node</strong> — highlights its direct connections<br/>
+          • <strong style={{ color: '#e2e8f0' }}>View tab</strong> — change node size metric, colour scheme, and link visibility thresholds<br/>
+          • <strong style={{ color: '#e2e8f0' }}>Update tab</strong> — re-run the layout algorithm or adjust clustering resolution<br/>
+          • <strong style={{ color: '#e2e8f0' }}>Screenshot</strong> — export the visualisation as an image
+        </div>
+        <Note>
+          The network link expires after 10 minutes. If the page doesn't load, go back to ORION and click the button again to generate a fresh link.
+        </Note>
+      </Section>
+
+      {/* ── Export queries ───────────────────────────────────────────── */}
+      <Section title="3 — What is a work ID?">
         <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7 }}>
           Every paper in the OpenAlex dataset has a unique <code style={{ color: '#a78bfa' }}>work_id</code> — a numeric identifier
           that links it across all tables. When you export from ORION, you get a list of these IDs.
@@ -93,7 +191,7 @@ export default function Guide() {
         </Note>
       </Section>
 
-      <Section title="2 — Generating your export query">
+      <Section title="4 — Generating your export query">
         <Step n="1">
           Go to either the <strong style={{ color: '#e2e8f0' }}>Institution Basket</strong> or <strong style={{ color: '#e2e8f0' }}>Funder Basket</strong> tab
           and add the institutions or funders you are interested in.
@@ -107,18 +205,17 @@ export default function Guide() {
         </Step>
       </Section>
 
-      <Section title="3 — Running the query in BigQuery">
+      <Section title="5 — Running the query in BigQuery">
         <Step n="1">
           Go to <a href="https://console.cloud.google.com/bigquery" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>console.cloud.google.com/bigquery</a> and
           make sure your project is selected in the top bar (the same project ID you used to log in to ORION).
         </Step>
         <Step n="2">
-          Click <strong style={{ color: '#e2e8f0' }}>+ Compose a new query</strong> (the button with a "+" in the top left of the editor area).
+          Click <strong style={{ color: '#e2e8f0' }}>+ Compose a new query</strong>.
         </Step>
         <Step n="3">
           Paste your query into the editor and click <strong style={{ color: '#e2e8f0' }}>Run</strong>.
-          The results will appear in a table below. BigQuery will show you how much data was scanned
-          before you run — this is what gets billed to your project.
+          BigQuery will show you how much data will be scanned before you run — this is what gets billed to your project.
         </Step>
         <Step n="4">
           To save the results, click <strong style={{ color: '#e2e8f0' }}>Save results</strong> above the results table.
@@ -130,7 +227,7 @@ export default function Guide() {
         </Note>
       </Section>
 
-      <Section title="4 — Joining with other OpenAlex tables">
+      <Section title="6 — Joining with other OpenAlex tables">
         <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: '.75rem' }}>
           Once you have a list of <code style={{ color: '#a78bfa' }}>work_id</code>s, you can join it with any table
           in <code style={{ color: '#a78bfa' }}>cwts-leiden.openalex_2025aug</code> using that field as the key.
@@ -157,7 +254,7 @@ export default function Guide() {
         </div>
       </Section>
 
-      <Section title="5 — Need help?">
+      <Section title="7 — Need help?">
         <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7 }}>
           If you are new to BigQuery, Google's{' '}
           <a href="https://cloud.google.com/bigquery/docs/query-overview" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>
@@ -166,6 +263,10 @@ export default function Guide() {
           is a good starting point. The OpenAlex data model is documented at{' '}
           <a href="https://docs.openalex.org" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>
             docs.openalex.org
+          </a>.
+          For questions about ORION, open an issue at{' '}
+          <a href="https://github.com/jpbascur/orion-app" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>
+            github.com/jpbascur/orion-app
           </a>.
         </p>
       </Section>

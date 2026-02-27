@@ -563,16 +563,20 @@ class VosInstRequest(BaseModel):
     institution_ids: List[int]
     year_from: int = 2000
     year_to: int = 2025
-    limit: int = 200
+    limit: int = 100
+    all_works: bool = False  # False = basket works only; True = all works among map nodes
 
 @app.post("/api/vos/build/institutions")
 def vos_build_institutions(req: VosInstRequest, request: Request):
     """Build a VOSviewer co-occurrence network for a basket of institutions.
 
-    Returns a token URL pointing to a pre-built VOSviewer JSON file.
-    Nodes = institutions that co-occur with basket institutions.
-    Edges = number of shared works between each pair of institutions.
-    Node weight = total works in the year range.
+    Nodes = basket institutions + their top co-occurring institutions (up to limit).
+    Node size = number of works (within the selected works pool).
+    Edge strength = number of shared works between each pair (within the selected works pool).
+
+    Works pool:
+      all_works=False (default): only works involving at least one basket institution.
+      all_works=True: all works involving any institution in the node set, regardless of basket.
     """
     session = require_auth(request)
     pid = session["project_id"]
@@ -582,8 +586,7 @@ def vos_build_institutions(req: VosInstRequest, request: Request):
     ids = req.institution_ids
     yf, yt, lim = req.year_from, req.year_to, req.limit
 
-    # Step 1: Get all institutions that appear on works involving the basket,
-    #         including the basket institutions themselves.
+    # Step 1: Identify node set — always based on basket works (determines who's in the map).
     node_rows, _ = run_query(f"""
         SELECT i.institution_id AS id, i.institution AS label,
                i.country_iso_alpha2_code AS country,
@@ -602,28 +605,68 @@ def vos_build_institutions(req: VosInstRequest, request: Request):
         LIMIT @limit
     """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
 
-    # Step 2: Get co-occurrence edge weights between all pairs in the node set.
     node_ids = [r["id"] for r in node_rows]
     if len(node_ids) < 2:
         raise HTTPException(status_code=400, detail="Not enough co-occurring institutions to build a network")
 
-    edge_rows, _ = run_query(f"""
-        SELECT wai1.institution_id AS source_id,
-               wai2.institution_id AS target_id,
-               COUNT(DISTINCT wai1.work_id) AS strength
-        FROM `{SOURCE}.work_affiliation_institution` wai1
-        JOIN `{SOURCE}.work_affiliation_institution` wai2
-            ON wai1.work_id = wai2.work_id
-           AND wai1.institution_id < wai2.institution_id
-        JOIN `{SOURCE}.work` w ON wai1.work_id = w.work_id
-        WHERE wai1.institution_id IN UNNEST(@node_ids)
-          AND wai2.institution_id IN UNNEST(@node_ids)
-          AND w.pub_year BETWEEN @year_from AND @year_to
-        GROUP BY source_id, target_id
-        HAVING strength > 0
-    """, {"node_ids": node_ids, "year_from": yf, "year_to": yt}, pid)
+    # Step 2: If all_works=True, recalculate node sizes using the full works pool
+    # (all works of the map institutions, not just basket works).
+    if req.all_works:
+        size_rows, _ = run_query(f"""
+            SELECT wai.institution_id AS id,
+                   COUNT(DISTINCT wai.work_id) AS works_count
+            FROM `{SOURCE}.work_affiliation_institution` wai
+            JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
+            WHERE wai.institution_id IN UNNEST(@node_ids)
+              AND w.pub_year BETWEEN @year_from AND @year_to
+            GROUP BY wai.institution_id
+        """, {"node_ids": node_ids, "year_from": yf, "year_to": yt}, pid)
+        size_map = {r["id"]: r["works_count"] for r in size_rows}
+        for r in node_rows:
+            r["works_count"] = size_map.get(r["id"], r["works_count"])
 
-    # Build VOSviewer JSON
+    # Step 3: Compute edge weights within the selected works pool.
+    if req.all_works:
+        # All works shared between any two map institutions.
+        edge_rows, _ = run_query(f"""
+            SELECT wai1.institution_id AS source_id,
+                   wai2.institution_id AS target_id,
+                   COUNT(DISTINCT wai1.work_id) AS strength
+            FROM `{SOURCE}.work_affiliation_institution` wai1
+            JOIN `{SOURCE}.work_affiliation_institution` wai2
+                ON wai1.work_id = wai2.work_id
+               AND wai1.institution_id < wai2.institution_id
+            JOIN `{SOURCE}.work` w ON wai1.work_id = w.work_id
+            WHERE wai1.institution_id IN UNNEST(@node_ids)
+              AND wai2.institution_id IN UNNEST(@node_ids)
+              AND w.pub_year BETWEEN @year_from AND @year_to
+            GROUP BY source_id, target_id
+            HAVING strength > 0
+        """, {"node_ids": node_ids, "year_from": yf, "year_to": yt}, pid)
+    else:
+        # Only works that involve at least one basket institution.
+        edge_rows, _ = run_query(f"""
+            SELECT wai1.institution_id AS source_id,
+                   wai2.institution_id AS target_id,
+                   COUNT(DISTINCT wai1.work_id) AS strength
+            FROM `{SOURCE}.work_affiliation_institution` wai1
+            JOIN `{SOURCE}.work_affiliation_institution` wai2
+                ON wai1.work_id = wai2.work_id
+               AND wai1.institution_id < wai2.institution_id
+            JOIN `{SOURCE}.work` w ON wai1.work_id = w.work_id
+            WHERE wai1.institution_id IN UNNEST(@node_ids)
+              AND wai2.institution_id IN UNNEST(@node_ids)
+              AND w.pub_year BETWEEN @year_from AND @year_to
+              AND w.work_id IN (
+                  SELECT DISTINCT work_id
+                  FROM `{SOURCE}.work_affiliation_institution`
+                  WHERE institution_id IN UNNEST(@ids)
+              )
+            GROUP BY source_id, target_id
+            HAVING strength > 0
+        """, {"node_ids": node_ids, "ids": ids, "year_from": yf, "year_to": yt}, pid)
+
+    works_label = "all works among map institutions" if req.all_works else "works involving basket institutions"
     basket_set = set(ids)
     items = [
         {
@@ -643,11 +686,15 @@ def vos_build_institutions(req: VosInstRequest, request: Request):
         "network": {"items": items, "links": links},
         "config": {
             "terminology": {"item": "institution", "items": "institutions", "link_strength": "co-occurring works"},
-            "parameters": {"item_size": 1, "largest_component": True},
+            "parameters": {"item_size": 2, "largest_component": True},
         },
         "info": {
             "title": f"Institution co-occurrence network ({yf}–{yt})",
-            "description": f"Nodes: institutions sharing works with your basket. Edge strength: number of shared works. Basket institutions shown in cluster 1.",
+            "description": (
+                f"Nodes: basket institutions (cluster 1, {len(ids)}) + top co-occurring institutions (cluster 2). "
+                f"Node size and edge strength based on {works_label}. "
+                f"Year range: {yf}–{yt}."
+            ),
         },
     }
     token = _store_vos(vos_json)
@@ -658,16 +705,20 @@ class VosFunderRequest(BaseModel):
     funder_ids: List[int]
     year_from: int = 2000
     year_to: int = 2025
-    limit: int = 200
+    limit: int = 100
+    all_works: bool = False  # False = basket works only; True = all works among map nodes
 
 @app.post("/api/vos/build/funders")
 def vos_build_funders(req: VosFunderRequest, request: Request):
     """Build a VOSviewer co-occurrence network for a basket of funders.
 
-    Returns a token URL pointing to a pre-built VOSviewer JSON file.
-    Nodes = funders that co-funded works involving the basket funders.
-    Edges = number of shared funded works between each pair of funders.
-    Node weight = total funded works in the year range.
+    Nodes = basket funders + their top co-occurring funders (up to limit).
+    Node size = number of works (within the selected works pool).
+    Edge strength = number of shared works between each pair (within the selected works pool).
+
+    Works pool:
+      all_works=False (default): only works involving at least one basket funder.
+      all_works=True: all works involving any funder in the node set, regardless of basket.
     """
     session = require_auth(request)
     pid = session["project_id"]
@@ -677,7 +728,7 @@ def vos_build_funders(req: VosFunderRequest, request: Request):
     ids = req.funder_ids
     yf, yt, lim = req.year_from, req.year_to, req.limit
 
-    # Step 1: Get all funders that appear on works funded by the basket.
+    # Step 1: Identify node set — always based on basket works.
     node_rows, _ = run_query(f"""
         SELECT f.funder_id AS id, f.funder AS label,
                f.country_iso_alpha2_code AS country,
@@ -699,23 +750,60 @@ def vos_build_funders(req: VosFunderRequest, request: Request):
     if len(node_ids) < 2:
         raise HTTPException(status_code=400, detail="Not enough co-occurring funders to build a network")
 
-    # Step 2: Get co-occurrence edge weights between all pairs in the node set.
-    edge_rows, _ = run_query(f"""
-        SELECT wg1.funder_id AS source_id,
-               wg2.funder_id AS target_id,
-               COUNT(DISTINCT wg1.work_id) AS strength
-        FROM `{SOURCE}.work_grant` wg1
-        JOIN `{SOURCE}.work_grant` wg2
-            ON wg1.work_id = wg2.work_id
-           AND wg1.funder_id < wg2.funder_id
-        JOIN `{SOURCE}.work` w ON wg1.work_id = w.work_id
-        WHERE wg1.funder_id IN UNNEST(@node_ids)
-          AND wg2.funder_id IN UNNEST(@node_ids)
-          AND w.pub_year BETWEEN @year_from AND @year_to
-        GROUP BY source_id, target_id
-        HAVING strength > 0
-    """, {"node_ids": node_ids, "year_from": yf, "year_to": yt}, pid)
+    # Step 2: If all_works=True, recalculate node sizes using the full works pool.
+    if req.all_works:
+        size_rows, _ = run_query(f"""
+            SELECT wg.funder_id AS id,
+                   COUNT(DISTINCT wg.work_id) AS works_count
+            FROM `{SOURCE}.work_grant` wg
+            JOIN `{SOURCE}.work` w ON wg.work_id = w.work_id
+            WHERE wg.funder_id IN UNNEST(@node_ids)
+              AND w.pub_year BETWEEN @year_from AND @year_to
+            GROUP BY wg.funder_id
+        """, {"node_ids": node_ids, "year_from": yf, "year_to": yt}, pid)
+        size_map = {r["id"]: r["works_count"] for r in size_rows}
+        for r in node_rows:
+            r["works_count"] = size_map.get(r["id"], r["works_count"])
 
+    # Step 3: Compute edge weights within the selected works pool.
+    if req.all_works:
+        edge_rows, _ = run_query(f"""
+            SELECT wg1.funder_id AS source_id,
+                   wg2.funder_id AS target_id,
+                   COUNT(DISTINCT wg1.work_id) AS strength
+            FROM `{SOURCE}.work_grant` wg1
+            JOIN `{SOURCE}.work_grant` wg2
+                ON wg1.work_id = wg2.work_id
+               AND wg1.funder_id < wg2.funder_id
+            JOIN `{SOURCE}.work` w ON wg1.work_id = w.work_id
+            WHERE wg1.funder_id IN UNNEST(@node_ids)
+              AND wg2.funder_id IN UNNEST(@node_ids)
+              AND w.pub_year BETWEEN @year_from AND @year_to
+            GROUP BY source_id, target_id
+            HAVING strength > 0
+        """, {"node_ids": node_ids, "year_from": yf, "year_to": yt}, pid)
+    else:
+        edge_rows, _ = run_query(f"""
+            SELECT wg1.funder_id AS source_id,
+                   wg2.funder_id AS target_id,
+                   COUNT(DISTINCT wg1.work_id) AS strength
+            FROM `{SOURCE}.work_grant` wg1
+            JOIN `{SOURCE}.work_grant` wg2
+                ON wg1.work_id = wg2.work_id
+               AND wg1.funder_id < wg2.funder_id
+            JOIN `{SOURCE}.work` w ON wg1.work_id = w.work_id
+            WHERE wg1.funder_id IN UNNEST(@node_ids)
+              AND wg2.funder_id IN UNNEST(@node_ids)
+              AND w.pub_year BETWEEN @year_from AND @year_to
+              AND w.work_id IN (
+                  SELECT DISTINCT work_id FROM `{SOURCE}.work_grant`
+                  WHERE funder_id IN UNNEST(@ids)
+              )
+            GROUP BY source_id, target_id
+            HAVING strength > 0
+        """, {"node_ids": node_ids, "ids": ids, "year_from": yf, "year_to": yt}, pid)
+
+    works_label = "all works among map funders" if req.all_works else "works involving basket funders"
     basket_set = set(ids)
     items = [
         {
@@ -735,11 +823,15 @@ def vos_build_funders(req: VosFunderRequest, request: Request):
         "network": {"items": items, "links": links},
         "config": {
             "terminology": {"item": "funder", "items": "funders", "link_strength": "co-funded works"},
-            "parameters": {"item_size": 1, "largest_component": True},
+            "parameters": {"item_size": 2, "largest_component": True},
         },
         "info": {
             "title": f"Funder co-occurrence network ({yf}–{yt})",
-            "description": f"Nodes: funders co-funding works with your basket funders. Edge strength: number of co-funded works. Basket funders shown in cluster 1.",
+            "description": (
+                f"Nodes: basket funders (cluster 1, {len(ids)}) + top co-occurring funders (cluster 2). "
+                f"Node size and edge strength based on {works_label}. "
+                f"Year range: {yf}–{yt}."
+            ),
         },
     }
     token = _store_vos(vos_json)

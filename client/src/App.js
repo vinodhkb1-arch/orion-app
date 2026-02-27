@@ -95,8 +95,8 @@ export default function App() {
       {page === 'overview'      && <Overview setPage={setPage} />}
       {page === 'institutions'  && <Institutions instData={instData} setInstData={setInstData} basket={instBasket} addToBasket={addInst} />}
       {page === 'funders'       && <Funders funderData={funderData} setFunderData={setFunderData} basket={funderBasket} addToBasket={addFunder} />}
-      {page === 'inst-basket'   && <InstBasket basket={instBasket} removeFromBasket={removeInst} basketData={instBasketData} setBasketData={setInstBasketData} addFunderToBasket={addFunder} addInstToBasket={addInst} />}
-      {page === 'funder-basket' && <FunderBasket basket={funderBasket} removeFromBasket={removeFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} addInstToBasket={addInst} addFunderToBasket={addFunder} />}
+      {page === 'inst-basket'   && <InstBasket basket={instBasket} removeFromBasket={removeInst} basketData={instBasketData} setBasketData={setInstBasketData} addFunderToBasket={addFunder} addInstToBasket={addInst} setPage={setPage} />}
+      {page === 'funder-basket' && <FunderBasket basket={funderBasket} removeFromBasket={removeFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} addInstToBasket={addInst} addFunderToBasket={addFunder} setPage={setPage} />}
       {page === 'guide'         && <Guide />}
     </>
   );
