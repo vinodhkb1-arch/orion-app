@@ -1,3 +1,12 @@
+# ORION Research Dashboard — v0.1.0
+# https://github.com/jpbascur/orion-app
+#
+# Copyright (c) 2025 Juan Pablo Bascur Cifuentes
+# Released under the MIT License — see LICENSE for details.
+#
+# Data: CWTS OpenAlex 2025 snapshot via the ORION initiative (https://orion-dbs.community)
+# Network visualisation: VOSviewer Online (Van Eck & Waltman, CWTS Leiden)
+
 import os
 import json
 import time

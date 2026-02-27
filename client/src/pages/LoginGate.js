@@ -70,6 +70,12 @@ export default function LoginGate() {
           Your Google account is used for identity only. You can revoke access at any time from your{' '}
           <a href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer" style={{ color: '#475569' }}>Google account settings</a>.
         </p>
+        <p style={{ color: '#2d3148', fontSize: '.7rem', marginTop: '.75rem', textAlign: 'center' }}>
+          Open source · MIT License ·{' '}
+          <a href="https://github.com/jpbascur/orion-app" target="_blank" rel="noreferrer" style={{ color: '#334155' }}>
+            github.com/jpbascur/orion-app
+          </a>
+        </p>
       </div>
     </div>
   );

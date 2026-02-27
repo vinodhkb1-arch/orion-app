@@ -1,4 +1,10 @@
 /**
+ * ORION Research Dashboard — v0.1.0
+ * https://github.com/jpbascur/orion-app
+ * Copyright (c) 2025 Juan Pablo Bascur Cifuentes — MIT License
+ */
+
+/**
  * The BigQuery dataset used by all backend queries and export SQL.
  * Update here when the dataset version changes — this is the single source
  * of truth for the frontend. The backend reads the same value from main.py:SOURCE.

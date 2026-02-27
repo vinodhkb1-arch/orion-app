@@ -12,7 +12,13 @@ export default function Overview({ setPage }) {
   return (
     <div className="page">
       <h1>ORION Research Dashboard</h1>
-      <p style={{color:'#64748b',marginBottom:'2rem'}}>Explore research institutions and funders from the CWTS/OpenAlex 2025 dataset.</p>
+      <p style={{color:'#64748b',marginBottom:'1rem'}}>Explore research institutions and funders from the CWTS/OpenAlex 2025 dataset.</p>
+      <p style={{color:'#334155',fontSize:'.8rem',marginBottom:'2rem'}}>
+        Open source · MIT License ·{' '}
+        <a href="https://github.com/jpbascur/orion-app" target="_blank" rel="noreferrer" style={{color:'#475569'}}>
+          github.com/jpbascur/orion-app
+        </a>
+      </p>
       <div className="cards">
         {NAV_CARDS.map(({ key, icon, label }) => (
           <button
@@ -26,7 +32,10 @@ export default function Overview({ setPage }) {
           </button>
         ))}
       </div>
-      <p style={{color:'#475569',fontSize:'.8rem',marginBottom:'2.5rem'}}>Source: <code>cwts-leiden.openalex_2025aug</code></p>
+      <p style={{color:'#475569',fontSize:'.8rem',marginBottom:'2.5rem'}}>
+        Source: <code>cwts-leiden.openalex_2025aug</code>
+        <span style={{marginLeft:'1.25rem',color:'#334155'}}>v0.1.0</span>
+      </p>
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:'1rem'}}>
         {[
@@ -56,6 +65,27 @@ export default function Overview({ setPage }) {
             <p style={{fontSize:'.85rem',color:'#94a3b8',lineHeight:1.65,margin:0}}>{body}</p>
           </div>
         ))}
+      </div>
+
+      {/* Acknowledgements */}
+      <div style={{marginTop:'2.5rem',paddingTop:'2rem',borderTop:'1px solid #1e2235'}}>
+        <p style={{fontSize:'.7rem',color:'#334155',marginBottom:'.6rem',textTransform:'uppercase',letterSpacing:'.06em',fontWeight:600}}>Acknowledgements</p>
+        <p style={{fontSize:'.78rem',color:'#475569',lineHeight:1.8,maxWidth:'720px'}}>
+          Data provided by the{' '}
+          <a href="https://orion-dbs.community" target="_blank" rel="noreferrer" style={{color:'#64748b'}}>ORION — Open Research Information on BigQuery</a>
+          {' '}initiative and{' '}
+          <a href="https://www.cwts.nl/" target="_blank" rel="noreferrer" style={{color:'#64748b'}}>CWTS Leiden</a>.
+          {' '}Research data sourced from{' '}
+          <a href="https://openalex.org" target="_blank" rel="noreferrer" style={{color:'#64748b'}}>OpenAlex</a>
+          {' '}(CC0).
+          {' '}Network visualisation powered by{' '}
+          <a href="https://app.vosviewer.com" target="_blank" rel="noreferrer" style={{color:'#64748b'}}>VOSviewer Online</a>
+          {' '}(Van Eck &amp; Waltman, CWTS Leiden).
+        </p>
+        <p style={{fontSize:'.72rem',color:'#2d3148',marginTop:'.75rem'}}>
+          MIT License · © 2025 Juan Pablo Bascur Cifuentes ·{' '}
+          <a href="https://github.com/jpbascur/orion-app" target="_blank" rel="noreferrer" style={{color:'#334155'}}>github.com/jpbascur/orion-app</a>
+        </p>
       </div>
     </div>
   );
