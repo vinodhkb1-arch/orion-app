@@ -66,8 +66,9 @@ tbody tr.in-basket{background:#1a2535}
 .frac{font-weight:600;color:#a78bfa;font-size:.85rem}
 .desc{color:#64748b;font-size:.8rem;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .status{padding:2rem;text-align:center;color:#475569;font-size:.9rem}
-.tbl-footer{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-top:1px solid #2d3148;background:#1a1d27;border-radius:0 0 10px 10px;font-size:.8rem;color:#475569}
+.tbl-footer{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.6rem 1rem;border-top:1px solid #2d3148;background:#1a1d27;border-radius:0 0 10px 10px;font-size:.8rem;color:#475569}
 .sort-note{color:#334155;font-style:italic}
+.tbl-expand{display:flex;gap:.5rem;margin-left:auto}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:2rem}
 .card{background:#1a1d27;border:1px solid #2d3148;border-radius:10px;padding:1.25rem;cursor:pointer;transition:border-color .2s;text-align:left;font-family:inherit;color:inherit;width:100%}
 .card:hover{border-color:#7c8cff}

@@ -19,6 +19,9 @@ import { apiFetch, exportCsv } from '../api';
 import { BytesTag } from '../bytesInfo';
 import { PermissionError, QueryModal } from './BasketShared';
 
+const DEFAULT_LIMIT = 100;
+const STEP = 100;
+
 export default function EntityList({
   entityData,
   setEntityData,
@@ -36,18 +39,19 @@ export default function EntityList({
   queryBuilder,
 }) {
   const { rows, yearFrom: fetchedYF, yearTo: fetchedYT, bytesProcessed } = entityData;
-  const [loading, setLoading]         = useState(false);
-  const [q,       setQ]               = useState('');
-  const [field,   setField]           = useState(fields[0].value);
-  const [yearFrom, setYF]             = useState(fetchedYF);
-  const [yearTo,   setYT]             = useState(fetchedYT);
-  const [permissionError, setPermErr] = useState(false);
+  const [loading, setLoading]           = useState(false);
+  const [q,       setQ]                 = useState('');
+  const [field,   setField]             = useState(fields[0].value);
+  const [yearFrom, setYF]               = useState(fetchedYF);
+  const [yearTo,   setYT]               = useState(fetchedYT);
+  const [permissionError, setPermErr]   = useState(false);
   const [showQuery,       setShowQuery] = useState(false);
+  const [displayLimit, setDisplayLimit] = useState(DEFAULT_LIMIT);
 
-  const { visibleRows, onSort, sortIcon, sortKey } = useTable(rows, 1000);
+  const { visibleRows, onSort, sortIcon, sortKey } = useTable(rows, displayLimit);
 
   const fetchData = (yf, yt, sq, sf) => {
-    setLoading(true); setPermErr(false);
+    setLoading(true); setPermErr(false); setDisplayLimit(DEFAULT_LIMIT);
     const url = sq.trim()
       ? `${apiSearch}?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=1000`
       : `${apiTop}?year_from=${yf}&year_to=${yt}&limit=1000`;
@@ -71,6 +75,8 @@ export default function EntityList({
   const SortTh = ({ k, children }) => (
     <th onClick={() => onSort(k)} className={sortKey === k ? 'sorted' : ''}>{children}{sortIcon(k)}</th>
   );
+
+  const hasMore = displayLimit < rows.length;
 
   return (
     <div className="page">
@@ -147,6 +153,16 @@ export default function EntityList({
           <div className="tbl-footer">
             <span>Showing {visibleRows.length} of {rows.length} results</span>
             {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
+            {hasMore && (
+              <div className="tbl-expand">
+                <button className="btn ghost" onClick={() => setDisplayLimit(l => l + STEP)}>
+                  + {STEP} more
+                </button>
+                <button className="btn ghost" onClick={() => setDisplayLimit(rows.length)}>
+                  Show all {rows.length.toLocaleString()}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

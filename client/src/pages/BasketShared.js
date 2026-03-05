@@ -53,8 +53,12 @@ export function QueryModal({ sql, onClose }) {
   );
 }
 
+const DEFAULT_LIMIT = 100;
+const STEP = 100;
+
 export function ResultTable({ rows, type, addToBasket, basket, idKey, loading }) {
-  const tbl = useTable(rows, 1000);
+  const [displayLimit, setDisplayLimit] = useState(DEFAULT_LIMIT);
+  const tbl = useTable(rows, displayLimit);
   const STh = (k, label) => (
     <th onClick={() => tbl.onSort(k)} className={tbl.sortKey === k ? 'sorted' : ''}>{label}{tbl.sortIcon(k)}</th>
   );
@@ -64,6 +68,7 @@ export function ResultTable({ rows, type, addToBasket, basket, idKey, loading })
   const isInst = type === 'institutions';
   const rowIdKey = isInst ? 'institution_id' : 'funder_id';
   const inBasket = id => basket ? basket.some(b => b[idKey ?? rowIdKey] === id || b[rowIdKey] === id) : false;
+  const hasMore = displayLimit < rows.length;
 
   return (
     <div className="table-wrap">
@@ -105,6 +110,16 @@ export function ResultTable({ rows, type, addToBasket, basket, idKey, loading })
       </table>
       <div className="tbl-footer">
         <span>Showing {tbl.visibleRows.length} of {rows.length} results</span>
+        {hasMore && (
+          <div className="tbl-expand">
+            <button className="btn ghost" onClick={() => setDisplayLimit(l => l + STEP)}>
+              + {STEP} more
+            </button>
+            <button className="btn ghost" onClick={() => setDisplayLimit(rows.length)}>
+              Show all {rows.length.toLocaleString()}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
