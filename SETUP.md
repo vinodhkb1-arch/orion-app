@@ -97,10 +97,10 @@ cd orion-app
 echo 'cd ~/orion-app && git checkout dev 2>/dev/null' >> ~/.bashrc
 ```
 
-**Every deploy after that** — just pull and run, no need to reclone:
+**Every deploy after that** — checkout first, then pull, then deploy:
 
 ```bash
-git pull && bash DEPLOY.sh --dev
+git checkout dev && git pull && bash DEPLOY.sh --dev
 ```
 
 **To deploy main (production):**
