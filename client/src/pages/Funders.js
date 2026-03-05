@@ -1,5 +1,6 @@
 import React from 'react';
 import EntityList from './EntityList';
+import { buildFunderWorksQuery } from './BasketShared';
 
 const FIELDS = [
   { value: 'name',        label: 'Name' },
@@ -20,6 +21,10 @@ export default function Funders({ funderData, setFunderData, basket, addToBasket
       fields={FIELDS}
       title="Funders"
       csvName="funders.csv"
+      queryBuilder={(yf, yt) => {
+        const ids = funderData.rows.map(r => r.funder_id);
+        return buildFunderWorksQuery(ids, yf, yt);
+      }}
       renderHeaders={SortTh => <>
         <SortTh k="name">Funder</SortTh>
         <SortTh k="country">Country</SortTh>

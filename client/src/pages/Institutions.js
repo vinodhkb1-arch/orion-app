@@ -1,5 +1,7 @@
 import React from 'react';
 import EntityList from './EntityList';
+import { buildInstWorksQuery } from './BasketShared';
+import { ORION_SOURCE } from '../api';
 
 const FIELDS = [
   { value: 'name',    label: 'Name' },
@@ -20,6 +22,10 @@ export default function Institutions({ instData, setInstData, basket, addToBaske
       fields={FIELDS}
       title="Institutions"
       csvName="institutions.csv"
+      queryBuilder={(yf, yt) => {
+        const ids = instData.rows.map(r => r.institution_id);
+        return buildInstWorksQuery(ids, yf, yt);
+      }}
       renderHeaders={SortTh => <>
         <SortTh k="name">Institution</SortTh>
         <SortTh k="type">Type</SortTh>

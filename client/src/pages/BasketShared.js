@@ -1,145 +1,25 @@
 /**
  * BasketShared.js
  *
- * Shared components and SQL query builders used by both InstBasket and FunderBasket.
- * All export-SQL mirrors the backend queries in main.py — if you update a query
- * in main.py, update the corresponding builder here too (they are coupled).
+ * Shared UI components used by both InstBasket and FunderBasket:
+ *   QueryModal   — modal to display and copy an export SQL query
+ *   ResultTable  — co-occurrence results table with basket-aware highlighting
+ *   PermissionError — BigQuery IAM setup guidance
  *
- * The dataset name comes from ORION_SOURCE in api.js — change it there only.
+ * SQL query builders have been moved to queryBuilders.js.
  */
 import React, { useState } from 'react';
 import useTable from './useTable';
-import { ORION_SOURCE } from '../api';
 
-// ── SQL query builders ────────────────────────────────────────────────────────
-
-export function buildInstWorksQuery(ids, yf, yt) {
-  return `-- ORION export: all works for institution basket
--- Institution IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns the unique work_id of every paper affiliated with
--- the selected institutions in the given year range.
--- See the Guide tab for instructions and join examples.
-
-SELECT DISTINCT wai.work_id
-FROM \`${ORION_SOURCE}.work_affiliation_institution\` wai
-JOIN \`${ORION_SOURCE}.work\` w ON wai.work_id = w.work_id
-WHERE wai.institution_id IN (${ids.join(', ')})
-  AND w.pub_year BETWEEN ${yf} AND ${yt}
-ORDER BY wai.work_id`;
-}
-
-export function buildInstCoInstQuery(ids, yf, yt) {
-  return `-- ORION export: co-occurring institutions for institution basket
--- Institution IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns institutions that share at least one paper with
--- the basket institutions, ranked by co-occurrence count.
-
-SELECT i.institution_id, i.institution AS name,
-       i.country_iso_alpha2_code AS country,
-       it.institution_type AS type,
-       COUNT(DISTINCT wai2.work_id) AS works_count
-FROM \`${ORION_SOURCE}.work_affiliation_institution\` wai
-JOIN \`${ORION_SOURCE}.work\` w ON wai.work_id = w.work_id
-JOIN \`${ORION_SOURCE}.work_affiliation_institution\` wai2
-    ON wai.work_id = wai2.work_id
-   AND wai2.institution_id NOT IN (${ids.join(', ')})
-JOIN \`${ORION_SOURCE}.institution\` i ON wai2.institution_id = i.institution_id
-LEFT JOIN \`${ORION_SOURCE}.institution_type\` it ON i.institution_type_id = it.institution_type_id
-WHERE wai.institution_id IN (${ids.join(', ')})
-  AND w.pub_year BETWEEN ${yf} AND ${yt}
-GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code, it.institution_type
-ORDER BY works_count DESC`;
-}
-
-export function buildInstCoFunderQuery(ids, yf, yt) {
-  return `-- ORION export: co-occurring funders for institution basket
--- Institution IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns funders whose grants appear on papers affiliated with
--- the basket institutions, ranked by co-occurrence count.
-
-SELECT f.funder_id, f.funder AS name,
-       f.country_iso_alpha2_code AS country,
-       COUNT(DISTINCT wg.work_id) AS works_count
-FROM \`${ORION_SOURCE}.work_affiliation_institution\` wai
-JOIN \`${ORION_SOURCE}.work\` w ON wai.work_id = w.work_id
-JOIN \`${ORION_SOURCE}.work_grant\` wg ON w.work_id = wg.work_id
-JOIN \`${ORION_SOURCE}.funder\` f ON wg.funder_id = f.funder_id
-WHERE wai.institution_id IN (${ids.join(', ')})
-  AND w.pub_year BETWEEN ${yf} AND ${yt}
-GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code
-ORDER BY works_count DESC`;
-}
-
-export function buildFunderWorksQuery(ids, yf, yt) {
-  return `-- ORION export: all works for funder basket
--- Funder IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns the unique work_id of every paper that acknowledges
--- funding from the selected funders in the given year range.
--- See the Guide tab for instructions and join examples.
-
-SELECT DISTINCT wg.work_id
-FROM \`${ORION_SOURCE}.work_grant\` wg
-JOIN \`${ORION_SOURCE}.work\` w ON wg.work_id = w.work_id
-WHERE wg.funder_id IN (${ids.join(', ')})
-  AND w.pub_year BETWEEN ${yf} AND ${yt}
-ORDER BY wg.work_id`;
-}
-
-export function buildFunderCoInstQuery(ids, yf, yt) {
-  return `-- ORION export: co-occurring institutions for funder basket
--- Funder IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns institutions affiliated with papers funded by
--- the basket funders, ranked by co-occurrence count.
-
-SELECT i.institution_id, i.institution AS name,
-       i.country_iso_alpha2_code AS country,
-       it.institution_type AS type,
-       COUNT(DISTINCT wai.work_id) AS works_count
-FROM \`${ORION_SOURCE}.work_grant\` wg
-JOIN \`${ORION_SOURCE}.work\` w ON wg.work_id = w.work_id
-JOIN \`${ORION_SOURCE}.work_affiliation_institution\` wai ON w.work_id = wai.work_id
-JOIN \`${ORION_SOURCE}.institution\` i ON wai.institution_id = i.institution_id
-LEFT JOIN \`${ORION_SOURCE}.institution_type\` it ON i.institution_type_id = it.institution_type_id
-WHERE wg.funder_id IN (${ids.join(', ')})
-  AND w.pub_year BETWEEN ${yf} AND ${yt}
-GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code, it.institution_type
-ORDER BY works_count DESC`;
-}
-
-export function buildFunderCoFunderQuery(ids, yf, yt) {
-  return `-- ORION export: co-occurring funders for funder basket
--- Funder IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns other funders that co-funded the same papers as
--- the basket funders, ranked by co-occurrence count.
-
-SELECT f.funder_id, f.funder AS name,
-       f.country_iso_alpha2_code AS country,
-       COUNT(DISTINCT wg2.work_id) AS works_count
-FROM \`${ORION_SOURCE}.work_grant\` wg
-JOIN \`${ORION_SOURCE}.work\` w ON wg.work_id = w.work_id
-JOIN \`${ORION_SOURCE}.work_grant\` wg2
-    ON wg.work_id = wg2.work_id
-   AND wg2.funder_id NOT IN (${ids.join(', ')})
-JOIN \`${ORION_SOURCE}.funder\` f ON wg2.funder_id = f.funder_id
-WHERE wg.funder_id IN (${ids.join(', ')})
-  AND w.pub_year BETWEEN ${yf} AND ${yt}
-GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code
-ORDER BY works_count DESC`;
-}
-
-// ── Shared components ─────────────────────────────────────────────────────────
+// Re-export query builders so existing imports don't break.
+export {
+  buildInstWorksQuery,
+  buildInstCoInstQuery,
+  buildInstCoFunderQuery,
+  buildFunderWorksQuery,
+  buildFunderCoInstQuery,
+  buildFunderCoFunderQuery,
+} from './queryBuilders';
 
 export function QueryModal({ sql, onClose }) {
   const [copied, setCopied] = useState(false);
@@ -171,7 +51,7 @@ export function QueryModal({ sql, onClose }) {
   );
 }
 
-export function ResultTable({ rows, type, addToBasket, loading }) {
+export function ResultTable({ rows, type, addToBasket, basket, idKey, loading }) {
   const tbl = useTable(rows, 1000);
   const STh = (k, label) => (
     <th onClick={() => tbl.onSort(k)} className={tbl.sortKey === k ? 'sorted' : ''}>{label}{tbl.sortIcon(k)}</th>
@@ -180,11 +60,15 @@ export function ResultTable({ rows, type, addToBasket, loading }) {
   if (!rows.length) return <div className="status">No results found.</div>;
 
   const isInst = type === 'institutions';
+  const rowIdKey = isInst ? 'institution_id' : 'funder_id';
+  const inBasket = id => basket ? basket.some(b => b[idKey ?? rowIdKey] === id || b[rowIdKey] === id) : false;
+
   return (
     <div className="table-wrap">
       <table>
         <thead><tr>
           <th>#</th>
+          <th></th>
           {STh('name', isInst ? 'Institution' : 'Funder')}
           {isInst && STh('type', 'Type')}
           {STh('country', 'Country')}
@@ -192,16 +76,29 @@ export function ResultTable({ rows, type, addToBasket, loading }) {
           <th></th>
         </tr></thead>
         <tbody>
-          {tbl.visibleRows.map((r, i) => (
-            <tr key={i}>
-              <td className="rank">{i + 1}</td>
-              <td>{r.name}</td>
-              {isInst && <td>{r.type ? <span className="badge-type">{r.type}</span> : '—'}</td>}
-              <td>{r.country ? <span className="badge-country">{r.country}</span> : '—'}</td>
-              <td className="works">{Number(r.works_count).toLocaleString()}</td>
-              <td><button className="btn secondary" style={{ padding: '.2rem .5rem', fontSize: '.75rem' }} onClick={() => addToBasket(r)}>+</button></td>
-            </tr>
-          ))}
+          {tbl.visibleRows.map((r, i) => {
+            const rid = r[rowIdKey];
+            const inBask = inBasket(rid);
+            return (
+              <tr key={i} className={inBask ? 'in-basket' : ''}>
+                <td className="rank">{i + 1}</td>
+                <td>
+                  {r.thumbnail_url
+                    ? <img className="thumb" src={r.thumbnail_url} alt="" />
+                    : <div className="thumb" />}
+                </td>
+                <td>{r.name}</td>
+                {isInst && <td>{r.type ? <span className="badge-type">{r.type}</span> : '—'}</td>}
+                <td>{r.country ? <span className="badge-country">{r.country}</span> : '—'}</td>
+                <td className="works">{Number(r.works_count).toLocaleString()}</td>
+                <td onClick={e => e.stopPropagation()}>
+                  {inBask
+                    ? <span style={{ color: '#4ade80', fontSize: '.8rem' }}>✓</span>
+                    : <button className="btn secondary" style={{ padding: '.2rem .5rem', fontSize: '.75rem' }} onClick={() => addToBasket(r)}>+</button>}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <div className="tbl-footer">

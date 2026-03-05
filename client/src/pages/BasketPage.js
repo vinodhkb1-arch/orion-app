@@ -316,6 +316,8 @@ export default function BasketPage({
                 rows={coInstResult?.rows || []}
                 type="institutions"
                 addToBasket={addInstToBasket}
+                basket={basket}
+                idKey="institution_id"
                 loading={coInstLoading}
               />
             </div>
@@ -333,6 +335,8 @@ export default function BasketPage({
                 rows={coFundResult?.rows || []}
                 type="funders"
                 addToBasket={addFunderToBasket}
+                basket={basket}
+                idKey="funder_id"
                 loading={coFundLoading}
               />
             </div>

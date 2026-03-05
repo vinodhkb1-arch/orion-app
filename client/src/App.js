@@ -7,38 +7,29 @@ import FunderBasket from './pages/FunderBasket';
 import Guide from './pages/Guide';
 import LoginGate from './pages/LoginGate';
 import ErrorPage from './pages/ErrorPage';
-
-function loadBasket(key) {
-  try { return JSON.parse(localStorage.getItem(key)) || []; }
-  catch { return []; }
-}
-
-function saveBasket(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-}
+import useBasket from './pages/useBasket';
 
 export default function App() {
   const [authState, setAuthState] = useState(null);
   const [page, setPage]           = useState('overview');
 
-  const [instBasket,   setInstBasketRaw]   = useState(() => loadBasket('orion_instBasket'));
-  const [funderBasket, setFunderBasketRaw] = useState(() => loadBasket('orion_funderBasket'));
-
-  const setInstBasket = val => {
-    const next = typeof val === 'function' ? val(instBasket) : val;
-    setInstBasketRaw(next);
-    saveBasket('orion_instBasket', next);
-  };
-  const setFunderBasket = val => {
-    const next = typeof val === 'function' ? val(funderBasket) : val;
-    setFunderBasketRaw(next);
-    saveBasket('orion_funderBasket', next);
-  };
+  const inst   = useBasket('orion_instBasket',  'institution_id', ['institution_id', 'name', 'country', 'type']);
+  const funder = useBasket('orion_funderBasket', 'funder_id',      ['funder_id', 'name', 'country']);
 
   const [instData,         setInstData]         = useState({ rows: [], yearFrom: 2020, yearTo: 2025, bytesProcessed: null });
   const [funderData,       setFunderData]       = useState({ rows: [], yearFrom: 2020, yearTo: 2025, bytesProcessed: null });
   const [instBasketData,   setInstBasketData]   = useState({ yearFrom: 2020, yearTo: 2025, worksResult: null, coInstResult: null, coFundResult: null });
   const [funderBasketData, setFunderBasketData] = useState({ yearFrom: 2020, yearTo: 2025, worksResult: null, coInstResult: null, coFundResult: null });
+
+  // Clear basket results when an item is removed, so stale data doesn't linger.
+  const removeInst = id => {
+    inst.removeFromBasket(id);
+    setInstBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
+  };
+  const removeFunder = id => {
+    funder.removeFromBasket(id);
+    setFunderBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
+  };
 
   useEffect(() => {
     fetch('/auth/me')
@@ -46,11 +37,6 @@ export default function App() {
       .then(d => setAuthState(d.authenticated ? d : false))
       .catch(() => setAuthState(false));
   }, []);
-
-  const addInst      = r => setInstBasket(p => p.find(b => b.institution_id === r.institution_id) ? p : [...p, { institution_id: r.institution_id, name: r.name, country: r.country, type: r.type }]);
-  const removeInst   = id => { setInstBasket(p => p.filter(b => b.institution_id !== id)); setInstBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null })); };
-  const addFunder    = r => setFunderBasket(p => p.find(b => b.funder_id === r.funder_id) ? p : [...p, { funder_id: r.funder_id, name: r.name, country: r.country }]);
-  const removeFunder = id => { setFunderBasket(p => p.filter(b => b.funder_id !== id)); setFunderBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null })); };
 
   const navItem = (key, label, count) => (
     <a key={key} href="#" className={page === key ? 'active' : ''} onClick={e => { e.preventDefault(); setPage(key); }}>
@@ -76,12 +62,12 @@ export default function App() {
       <nav>
         <span className="logo">⭐ ORION</span>
         <span style={{ fontSize: '.65rem', color: '#2d3148', marginLeft: '-.75rem', marginTop: '.1rem', alignSelf: 'flex-end', paddingBottom: '12px' }}>v0.1.0</span>
-        {navItem('overview', 'Overview', 0)}
-        {navItem('institutions', 'Institutions', 0)}
-        {navItem('funders', 'Funders', 0)}
-        {navItem('inst-basket', 'Inst. Basket', instBasket.length)}
-        {navItem('funder-basket', 'Funder Basket', funderBasket.length)}
-        {navItem('guide', 'Guide', 0)}
+        {navItem('overview',      'Overview',      0)}
+        {navItem('institutions',  'Institutions',  0)}
+        {navItem('funders',       'Funders',       0)}
+        {navItem('inst-basket',   'Inst. Basket',  inst.basket.length)}
+        {navItem('funder-basket', 'Funder Basket', funder.basket.length)}
+        {navItem('guide',         'Guide',         0)}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span style={{ fontSize: '.75rem', color: '#475569' }} title={authState.email}>
             {authState.name || authState.email}
@@ -93,10 +79,10 @@ export default function App() {
         </div>
       </nav>
       {page === 'overview'      && <Overview setPage={setPage} />}
-      {page === 'institutions'  && <Institutions instData={instData} setInstData={setInstData} basket={instBasket} addToBasket={addInst} projectId={authState.project_id} />}
-      {page === 'funders'       && <Funders funderData={funderData} setFunderData={setFunderData} basket={funderBasket} addToBasket={addFunder} projectId={authState.project_id} />}
-      {page === 'inst-basket'   && <InstBasket basket={instBasket} removeFromBasket={removeInst} basketData={instBasketData} setBasketData={setInstBasketData} addFunderToBasket={addFunder} addInstToBasket={addInst} setPage={setPage} projectId={authState.project_id} />}
-      {page === 'funder-basket' && <FunderBasket basket={funderBasket} removeFromBasket={removeFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} addInstToBasket={addInst} addFunderToBasket={addFunder} setPage={setPage} projectId={authState.project_id} />}
+      {page === 'institutions'  && <Institutions instData={instData} setInstData={setInstData} basket={inst.basket} addToBasket={inst.addToBasket} projectId={authState.project_id} />}
+      {page === 'funders'       && <Funders funderData={funderData} setFunderData={setFunderData} basket={funder.basket} addToBasket={funder.addToBasket} projectId={authState.project_id} />}
+      {page === 'inst-basket'   && <InstBasket basket={inst.basket} removeFromBasket={removeInst} basketData={instBasketData} setBasketData={setInstBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} setPage={setPage} projectId={authState.project_id} />}
+      {page === 'funder-basket' && <FunderBasket basket={funder.basket} removeFromBasket={removeFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} setPage={setPage} projectId={authState.project_id} />}
       {page === 'guide'         && <Guide />}
     </>
   );

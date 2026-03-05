@@ -17,7 +17,7 @@ import React, { useState } from 'react';
 import useTable from './useTable';
 import { apiFetch, exportCsv } from '../api';
 import { BytesTag } from '../bytesInfo';
-import { PermissionError } from './BasketShared';
+import { PermissionError, QueryModal } from './BasketShared';
 
 export default function EntityList({
   entityData,
@@ -33,6 +33,7 @@ export default function EntityList({
   renderHeaders,
   renderRow,
   projectId,
+  queryBuilder,
 }) {
   const { rows, yearFrom: fetchedYF, yearTo: fetchedYT, bytesProcessed } = entityData;
   const [loading, setLoading]         = useState(false);
@@ -41,6 +42,7 @@ export default function EntityList({
   const [yearFrom, setYF]             = useState(fetchedYF);
   const [yearTo,   setYT]             = useState(fetchedYT);
   const [permissionError, setPermErr] = useState(false);
+  const [showQuery,       setShowQuery] = useState(false);
 
   const { visibleRows, onSort, sortIcon, sortKey } = useTable(rows, 1000);
 
@@ -98,6 +100,9 @@ export default function EntityList({
         {rows.length > 0 && (
           <button className="btn ghost" onClick={() => exportCsv(rows, csvName)}>⬇ CSV</button>
         )}
+        {rows.length > 0 && queryBuilder && (
+          <button className="btn ghost" onClick={() => setShowQuery(true)}>Get export query</button>
+        )}
       </div>
 
       {bytesProcessed != null && (
@@ -144,6 +149,9 @@ export default function EntityList({
             {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
           </div>
         </div>
+      )}
+      {showQuery && queryBuilder && (
+        <QueryModal sql={queryBuilder(fetchedYF, fetchedYT)} onClose={() => setShowQuery(false)} />
       )}
     </div>
   );
