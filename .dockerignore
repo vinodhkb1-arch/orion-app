@@ -1,0 +1,21 @@
+# Git history — never needed in the image
+.git
+.gitignore
+
+# Local dev artifacts
+node_modules
+client/node_modules
+client/build
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.*
+!.env.example
+
+# Docs / tooling not needed at runtime
+*.md
+DEV_SETUP.md
+SETUP.md
+DEPLOY.sh
+cloudbuild*.yaml

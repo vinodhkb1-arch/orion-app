@@ -1,19 +1,32 @@
 steps:
-  # Build the Docker image from the current directory
+  # Pull the last image so Docker can reuse its layers as a cache.
+  # The || true means the build continues on first-ever deploy (no image yet).
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'docker pull gcr.io/$PROJECT_ID/orion-app:latest || true'
+
+  # Build — --cache-from reuses layers from the pulled image.
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      - '--cache-from'
+      - 'gcr.io/$PROJECT_ID/orion-app:latest'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/orion-app'
+      - 'gcr.io/$PROJECT_ID/orion-app:latest'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/orion-app:$SHORT_SHA'
       - '.'
 
-  # Push to Container Registry
+  # Push both tags in one step.
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
+      - '--all-tags'
       - 'gcr.io/$PROJECT_ID/orion-app'
 
-  # Deploy to Cloud Run
+  # Deploy to Cloud Run.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -21,7 +34,7 @@ steps:
       - 'deploy'
       - 'orion-app'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/orion-app'
+      - 'gcr.io/$PROJECT_ID/orion-app:$SHORT_SHA'
       - '--platform'
       - 'managed'
       - '--region'
@@ -29,4 +42,5 @@ steps:
       - '--allow-unauthenticated'
 
 images:
-  - 'gcr.io/$PROJECT_ID/orion-app'
+  - 'gcr.io/$PROJECT_ID/orion-app:latest'
+  - 'gcr.io/$PROJECT_ID/orion-app:$SHORT_SHA'
