@@ -13,7 +13,7 @@
 import React, { useState } from 'react';
 import { apiFetch, openVosViewer } from '../api';
 import { BytesTag } from '../bytesInfo';
-import { QueryModal, ResultTable, PermissionError } from './BasketShared';
+import { QueryModal, ResultTable, PermissionError, CollapsibleSection } from './BasketShared';
 
 export default function BasketPage({
   basket,
@@ -285,12 +285,11 @@ export default function BasketPage({
 
           {/* Works result */}
           {worksResult && worksResult.total_works > 0 && (
-            <div style={{ marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.75rem', flexWrap: 'wrap' }}>
-                <div className="section-title" style={{ margin: 0 }}>All works</div>
-                <BytesTag bytes={worksResult.bytes_processed} />
-                <button className="btn ghost" style={{ marginLeft: 'auto' }} onClick={() => setWorksQuery(true)}>Get export query</button>
-              </div>
+            <CollapsibleSection
+              title="All works"
+              badge={<BytesTag bytes={worksResult.bytes_processed} />}
+              actions={<button className="btn ghost" onClick={() => setWorksQuery(true)}>Get export query</button>}
+            >
               <div className="stat-box" style={{ display: 'inline-block', minWidth: '200px' }}>
                 <div className="stat-val">{Number(worksResult.total_works).toLocaleString()}</div>
                 <div className="stat-lbl">
@@ -298,7 +297,7 @@ export default function BasketPage({
                   <small style={{ color: '#334155' }}>No double counting</small>
                 </div>
               </div>
-            </div>
+            </CollapsibleSection>
           )}
           {worksResult && worksResult.total_works === 0 && (
             <div className="status" style={{ marginBottom: '2rem' }}>No works found for this basket in {wYF}–{wYT}.</div>
@@ -306,12 +305,11 @@ export default function BasketPage({
 
           {/* Co-institutions result */}
           {(coInstResult || coInstLoading) && (
-            <div style={{ marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.75rem', flexWrap: 'wrap' }}>
-                <div className="section-title" style={{ margin: 0 }}>Co-occurring institutions</div>
-                {coInstResult && <BytesTag bytes={coInstResult.bytes_processed} />}
-                {coInstResult && <button className="btn ghost" style={{ marginLeft: 'auto' }} onClick={() => setCoInstQuery(true)}>Get export query</button>}
-              </div>
+            <CollapsibleSection
+              title="Co-occurring institutions"
+              badge={coInstResult && <BytesTag bytes={coInstResult.bytes_processed} />}
+              actions={coInstResult && <button className="btn ghost" onClick={() => setCoInstQuery(true)}>Get export query</button>}
+            >
               <ResultTable
                 rows={coInstResult?.rows || []}
                 type="institutions"
@@ -320,17 +318,16 @@ export default function BasketPage({
                 idKey="institution_id"
                 loading={coInstLoading}
               />
-            </div>
+            </CollapsibleSection>
           )}
 
           {/* Co-funders result */}
           {(coFundResult || coFundLoading) && (
-            <div style={{ marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.75rem', flexWrap: 'wrap' }}>
-                <div className="section-title" style={{ margin: 0 }}>Co-occurring funders</div>
-                {coFundResult && <BytesTag bytes={coFundResult.bytes_processed} />}
-                {coFundResult && <button className="btn ghost" style={{ marginLeft: 'auto' }} onClick={() => setCoFundQuery(true)}>Get export query</button>}
-              </div>
+            <CollapsibleSection
+              title="Co-occurring funders"
+              badge={coFundResult && <BytesTag bytes={coFundResult.bytes_processed} />}
+              actions={coFundResult && <button className="btn ghost" onClick={() => setCoFundQuery(true)}>Get export query</button>}
+            >
               <ResultTable
                 rows={coFundResult?.rows || []}
                 type="funders"
@@ -339,7 +336,7 @@ export default function BasketPage({
                 idKey="funder_id"
                 loading={coFundLoading}
               />
-            </div>
+            </CollapsibleSection>
           )}
 
           {worksQuery  && <QueryModal sql={queryBuilders.works(ids, wYF, wYT)}    onClose={() => setWorksQuery(false)} />}

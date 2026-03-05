@@ -47,6 +47,7 @@ export default function EntityList({
   const [permissionError, setPermErr]   = useState(false);
   const [showQuery,       setShowQuery] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(DEFAULT_LIMIT);
+  const [minimized, setMinimized] = useState(false);
 
   const { visibleRows, onSort, sortIcon, sortKey } = useTable(rows, displayLimit);
 
@@ -128,43 +129,45 @@ export default function EntityList({
         <div className="status">Use the controls above and click Search to load data.</div>
       )}
       {!loading && rows.length > 0 && (
-        <div className="table-wrap">
-          <table>
-            <thead><tr>
-              <th>#</th>
-              <th></th>
-              {renderHeaders(SortTh)}
-              <th></th>
-            </tr></thead>
-            <tbody>
-              {visibleRows.map((r, i) => (
-                <tr key={r[idKey]} className={inBasket(r[idKey]) ? 'in-basket' : ''}>
-                  <td className="rank">{i + 1}</td>
-                  <td>
-                    {r.thumbnail_url
-                      ? <img className="thumb" src={r.thumbnail_url} alt="" />
-                      : <div className="thumb" />}
-                  </td>
-                  {renderRow(r, inBasket(r[idKey]), addToBasket)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="tbl-footer">
-            <span>Showing {visibleRows.length} of {rows.length} results</span>
-            {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
-            {hasMore && (
-              <div className="tbl-expand">
-                <button className="btn ghost" onClick={() => setDisplayLimit(l => l + STEP)}>
-                  + {STEP} more
-                </button>
-                <button className="btn ghost" onClick={() => setDisplayLimit(rows.length)}>
-                  Show all {rows.length.toLocaleString()}
-                </button>
+        minimized
+          ? <div className="tbl-minimized">
+              <span>{rows.length.toLocaleString()} results hidden</span>
+              <button className="btn ghost" onClick={() => setMinimized(false)}>Show table</button>
+            </div>
+          : <div className="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>#</th>
+                  <th></th>
+                  {renderHeaders(SortTh)}
+                  <th></th>
+                </tr></thead>
+                <tbody>
+                  {visibleRows.map((r, i) => (
+                    <tr key={r[idKey]} className={inBasket(r[idKey]) ? 'in-basket' : ''}>
+                      <td className="rank">{i + 1}</td>
+                      <td>
+                        {r.thumbnail_url
+                          ? <img className="thumb" src={r.thumbnail_url} alt="" />
+                          : <div className="thumb" />}
+                      </td>
+                      {renderRow(r, inBasket(r[idKey]), addToBasket)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="tbl-footer">
+                <span>Showing {visibleRows.length} of {rows.length} results</span>
+                {sortKey && <span className="sort-note">Sorted within first {visibleRows.length} results</span>}
+                <div className="tbl-expand">
+                  {hasMore && (<>
+                    <button className="btn ghost" onClick={() => setDisplayLimit(l => l + STEP)}>+ {STEP} more</button>
+                    <button className="btn ghost" onClick={() => setDisplayLimit(rows.length)}>Show all {rows.length.toLocaleString()}</button>
+                  </>)}
+                  <button className="btn ghost" onClick={() => setMinimized(true)} title="Minimize table">− Minimize</button>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
       )}
       {showQuery && queryBuilder && (
         <QueryModal sql={queryBuilder(fetchedYF, fetchedYT, q, field)} onClose={() => setShowQuery(false)} />

@@ -53,17 +53,44 @@ export function QueryModal({ sql, onClose }) {
   );
 }
 
+export function CollapsibleSection({ title, badge, actions, children, defaultOpen = true }) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: '2rem' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: open ? '.75rem' : 0, flexWrap: 'wrap', cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span style={{ fontSize: '.85rem', color: '#475569', lineHeight: 1, transition: 'transform .2s', display: 'inline-block', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+        <div className="section-title" style={{ margin: 0 }}>{title}</div>
+        {badge}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }} onClick={e => e.stopPropagation()}>
+          {actions}
+        </div>
+      </div>
+      {open && children}
+    </div>
+  );
+}
+
 const DEFAULT_LIMIT = 100;
 const STEP = 100;
 
 export function ResultTable({ rows, type, addToBasket, basket, idKey, loading }) {
   const [displayLimit, setDisplayLimit] = useState(DEFAULT_LIMIT);
+  const [minimized, setMinimized] = useState(false);
   const tbl = useTable(rows, displayLimit);
   const STh = (k, label) => (
     <th onClick={() => tbl.onSort(k)} className={tbl.sortKey === k ? 'sorted' : ''}>{label}{tbl.sortIcon(k)}</th>
   );
   if (loading) return <div className="status">Running…</div>;
   if (!rows.length) return <div className="status">No results found.</div>;
+  if (minimized) return (
+    <div className="tbl-minimized">
+      <span>{rows.length.toLocaleString()} results hidden</span>
+      <button className="btn ghost" onClick={() => setMinimized(false)}>Show table</button>
+    </div>
+  );
 
   const isInst = type === 'institutions';
   const rowIdKey = isInst ? 'institution_id' : 'funder_id';
@@ -110,16 +137,13 @@ export function ResultTable({ rows, type, addToBasket, basket, idKey, loading })
       </table>
       <div className="tbl-footer">
         <span>Showing {tbl.visibleRows.length} of {rows.length} results</span>
-        {hasMore && (
-          <div className="tbl-expand">
-            <button className="btn ghost" onClick={() => setDisplayLimit(l => l + STEP)}>
-              + {STEP} more
-            </button>
-            <button className="btn ghost" onClick={() => setDisplayLimit(rows.length)}>
-              Show all {rows.length.toLocaleString()}
-            </button>
-          </div>
-        )}
+        <div className="tbl-expand">
+          {hasMore && (<>
+            <button className="btn ghost" onClick={() => setDisplayLimit(l => l + STEP)}>+ {STEP} more</button>
+            <button className="btn ghost" onClick={() => setDisplayLimit(rows.length)}>Show all {rows.length.toLocaleString()}</button>
+          </>)}
+          <button className="btn ghost" onClick={() => setMinimized(true)} title="Minimize table">− Minimize</button>
+        </div>
       </div>
     </div>
   );
