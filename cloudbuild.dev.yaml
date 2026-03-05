@@ -1,22 +1,31 @@
 steps:
-  # Build the Docker image tagged for dev
+  # Pull the last dev image to use as a layer cache.
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'docker pull gcr.io/$PROJECT_ID/orion-app-dev:latest || true'
+
+  # Build — reuse cached layers from the previous image.
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
+      - '--cache-from'
+      - 'gcr.io/$PROJECT_ID/orion-app-dev:latest'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/orion-app-dev'
+      - 'gcr.io/$PROJECT_ID/orion-app-dev:latest'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/orion-app-dev:$SHORT_SHA'
       - '.'
 
-  # Push to Container Registry
-  # Note: gcr.io (Container Registry) is deprecated; Google recommends migrating
-  # to Artifact Registry (e.g. europe-west1-docker.pkg.dev/$PROJECT_ID/orion/orion-app-dev).
-  # Functionality is unchanged for now — migrate when convenient.
+  # Push both tags.
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
+      - '--all-tags'
       - 'gcr.io/$PROJECT_ID/orion-app-dev'
 
-  # Deploy to the DEV Cloud Run service (separate from production)
+  # Deploy to the DEV Cloud Run service.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -24,7 +33,7 @@ steps:
       - 'deploy'
       - 'orion-app-dev'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/orion-app-dev'
+      - 'gcr.io/$PROJECT_ID/orion-app-dev:$SHORT_SHA'
       - '--platform'
       - 'managed'
       - '--region'
@@ -32,4 +41,5 @@ steps:
       - '--allow-unauthenticated'
 
 images:
-  - 'gcr.io/$PROJECT_ID/orion-app-dev'
+  - 'gcr.io/$PROJECT_ID/orion-app-dev:latest'
+  - 'gcr.io/$PROJECT_ID/orion-app-dev:$SHORT_SHA'

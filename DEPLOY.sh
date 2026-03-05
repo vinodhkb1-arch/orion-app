@@ -2,12 +2,24 @@
 set -e
 
 # ── ORION Dashboard — Deploy ──────────────────────────────────────────────────
-# Usage:
-#   bash DEPLOY.sh            → deploy to PRODUCTION (orion-app)
-#   bash DEPLOY.sh --dev      → deploy to DEV (orion-app-dev)
+# Usage (from Cloud Shell):
 #
-# Run from Cloud Shell inside the orion-app directory after pulling changes:
-#   git pull && bash DEPLOY.sh [--dev]
+#   First time:
+#     git clone https://github.com/jpbascur/orion-app.git && cd orion-app
+#
+#   Every deploy after that — just pull and run, no rm needed:
+#     git pull && bash DEPLOY.sh [--dev]
+#
+#   Or to switch branches:
+#     git fetch && git checkout dev && bash DEPLOY.sh --dev
+#
+#   bash DEPLOY.sh        → deploy to PRODUCTION (orion-app)
+#   bash DEPLOY.sh --dev  → deploy to DEV (orion-app-dev)
+#
+# Why not rm -rf + git clone each time?
+#   It doesn't help — Docker layer caching happens on Cloud Build's remote VMs,
+#   not your local Cloud Shell. Re-cloning just wastes 30–60 seconds uploading
+#   a fresh build context instead of letting gcloud diff it.
 # ──────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ID="dashboard-488117"
