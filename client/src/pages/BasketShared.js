@@ -19,6 +19,8 @@ export {
   buildFunderWorksQuery,
   buildFunderCoInstQuery,
   buildFunderCoFunderQuery,
+  buildInstSearchQuery,
+  buildFunderSearchQuery,
 } from './queryBuilders';
 
 export function QueryModal({ sql, onClose }) {

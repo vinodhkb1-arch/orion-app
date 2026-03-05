@@ -134,4 +134,93 @@ GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code
 ORDER BY works_count DESC`;
 }
 
+// ── Search / browse query builders (for EntityList "Get export query") ────────
+
+const INST_FIELD_MAP = {
+  name:    'i.institution',
+  country: 'i.country_iso_alpha2_code',
+  type:    'it.institution_type',
+};
+
+const FUNDER_FIELD_MAP = {
+  name:        'f.funder',
+  country:     'f.country_iso_alpha2_code',
+  description: 'f.description',
+};
+
+/**
+ * Mirrors the backend /api/institutions/search (or /top when q is empty).
+ * q='' → top institutions by works_count; otherwise LIKE filter on `field`.
+ */
+export function buildInstSearchQuery(q, field, yf, yt, limit = 1000) {
+  const col   = INST_FIELD_MAP[field] ?? 'i.institution';
+  const where = q.trim()
+    ? `WHERE LOWER(${col}) LIKE '%${q.toLowerCase().replace(/'/g, "\\'")}%'`
+    : '-- No filter applied (top institutions by works count)';
+  const desc  = q.trim()
+    ? `-- Search: ${field} LIKE '%${q}%'`
+    : '-- Browse: top institutions by works count';
+  return `-- ORION export: institution search results
+${desc}
+-- Year range: ${yf}–${yt}
+--
+-- Returns the institutions shown in the Institutions tab for the
+-- current search, ordered by works count in the given year range.
+
+SELECT
+    i.institution_id,
+    i.institution          AS name,
+    i.country_iso_alpha2_code AS country,
+    it.institution_type    AS type,
+    COUNT(DISTINCT wai.work_id) AS works_count
+FROM \`${ORION_SOURCE}.institution\` i
+LEFT JOIN \`${ORION_SOURCE}.institution_type\` it
+    ON i.institution_type_id = it.institution_type_id
+LEFT JOIN \`${ORION_SOURCE}.work_affiliation_institution\` wai
+    ON i.institution_id = wai.institution_id
+LEFT JOIN \`${ORION_SOURCE}.work\` w
+    ON wai.work_id = w.work_id
+   AND w.pub_year BETWEEN ${yf} AND ${yt}
+${where}
+GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code, it.institution_type
+ORDER BY works_count DESC
+LIMIT ${limit}`;
+}
+
+/**
+ * Mirrors the backend /api/funders/search (or /top when q is empty).
+ */
+export function buildFunderSearchQuery(q, field, yf, yt, limit = 1000) {
+  const col   = FUNDER_FIELD_MAP[field] ?? 'f.funder';
+  const where = q.trim()
+    ? `WHERE LOWER(${col}) LIKE '%${q.toLowerCase().replace(/'/g, "\\'")}%'`
+    : '-- No filter applied (top funders by works count)';
+  const desc  = q.trim()
+    ? `-- Search: ${field} LIKE '%${q}%'`
+    : '-- Browse: top funders by works count';
+  return `-- ORION export: funder search results
+${desc}
+-- Year range: ${yf}–${yt}
+--
+-- Returns the funders shown in the Funders tab for the
+-- current search, ordered by works count in the given year range.
+
+SELECT
+    f.funder_id,
+    f.funder                  AS name,
+    f.country_iso_alpha2_code AS country,
+    f.description,
+    COUNT(DISTINCT wg.work_id) AS works_count
+FROM \`${ORION_SOURCE}.funder\` f
+LEFT JOIN \`${ORION_SOURCE}.work_grant\` wg
+    ON f.funder_id = wg.funder_id
+LEFT JOIN \`${ORION_SOURCE}.work\` w
+    ON wg.work_id = w.work_id
+   AND w.pub_year BETWEEN ${yf} AND ${yt}
+${where}
+GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code, f.description
+ORDER BY works_count DESC
+LIMIT ${limit}`;
+}
+
 // ── Shared components ─────────────────────────────────────────────────────────

@@ -151,7 +151,7 @@ export default function EntityList({
         </div>
       )}
       {showQuery && queryBuilder && (
-        <QueryModal sql={queryBuilder(fetchedYF, fetchedYT)} onClose={() => setShowQuery(false)} />
+        <QueryModal sql={queryBuilder(fetchedYF, fetchedYT, q, field)} onClose={() => setShowQuery(false)} />
       )}
     </div>
   );
