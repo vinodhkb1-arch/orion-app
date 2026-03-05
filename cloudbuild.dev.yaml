@@ -1,26 +1,13 @@
 steps:
-  # Pull the last dev image to use as a layer cache.
-  - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: 'bash'
+  # Build and push using kaniko — caches layers to GCS between builds.
+  # This means npm install and pip install are skipped when unchanged,
+  # even on fresh Cloud Build VMs.
+  - name: 'gcr.io/kaniko-project/executor:latest'
     args:
-      - '-c'
-      - 'docker pull gcr.io/$PROJECT_ID/orion-app-dev:latest || true'
-
-  # Build — reuse cached layers from the previous image.
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '--cache-from'
-      - 'gcr.io/$PROJECT_ID/orion-app-dev:latest'
-      - '-t'
-      - 'gcr.io/$PROJECT_ID/orion-app-dev:latest'
-      - '.'
-
-  # Push both tags.
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/$PROJECT_ID/orion-app-dev:latest'
+      - '--destination=gcr.io/$PROJECT_ID/orion-app-dev:latest'
+      - '--cache=true'
+      - '--cache-ttl=168h'
+      - '--context=dir:///workspace'
 
   # Deploy to the DEV Cloud Run service.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
