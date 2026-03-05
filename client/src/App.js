@@ -21,7 +21,6 @@ export default function App() {
   const [instBasketData,   setInstBasketData]   = useState({ yearFrom: 2020, yearTo: 2025, worksResult: null, coInstResult: null, coFundResult: null });
   const [funderBasketData, setFunderBasketData] = useState({ yearFrom: 2020, yearTo: 2025, worksResult: null, coInstResult: null, coFundResult: null });
 
-  // Clear basket results when an item is removed, so stale data doesn't linger.
   const removeInst = id => {
     inst.removeFromBasket(id);
     setInstBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
@@ -38,11 +37,19 @@ export default function App() {
       .catch(() => setAuthState(false));
   }, []);
 
-  const navItem = (key, label, count) => (
-    <a key={key} href="#" className={page === key ? 'active' : ''} onClick={e => { e.preventDefault(); setPage(key); }}>
+  const navTab = (key, label, count) => (
+    <a
+      key={key}
+      href="#"
+      className={'nav-tab' + (page === key ? ' active' : '')}
+      onClick={e => { e.preventDefault(); setPage(key); }}
+    >
       {label}{count > 0 && <span className="badge">{count}</span>}
     </a>
   );
+
+  const searchActive = page === 'institutions' || page === 'funders';
+  const basketActive = page === 'inst-basket'  || page === 'funder-basket';
 
   if (authState === null) {
     return (
@@ -62,12 +69,27 @@ export default function App() {
       <nav>
         <span className="logo">⭐ ORION</span>
         <span style={{ fontSize: '.65rem', color: '#2d3148', marginLeft: '-.75rem', marginTop: '.1rem', alignSelf: 'flex-end', paddingBottom: '12px' }}>v0.1.0</span>
-        {navItem('overview',      'Overview',      0)}
-        {navItem('institutions',  'Institutions',  0)}
-        {navItem('funders',       'Funders',       0)}
-        {navItem('inst-basket',   'Inst. Basket',  inst.basket.length)}
-        {navItem('funder-basket', 'Funder Basket', funder.basket.length)}
-        {navItem('guide',         'Guide',         0)}
+
+        {navTab('overview', 'Overview', 0)}
+
+        <div className={'nav-group' + (searchActive ? ' nav-group-active' : '')}>
+          <span className="nav-group-label">Search</span>
+          <div className="nav-group-tabs">
+            {navTab('institutions', 'Institutions', 0)}
+            {navTab('funders',      'Funders',      0)}
+          </div>
+        </div>
+
+        <div className={'nav-group' + (basketActive ? ' nav-group-active' : '')}>
+          <span className="nav-group-label">Basket</span>
+          <div className="nav-group-tabs">
+            {navTab('inst-basket',   'Institutions', inst.basket.length)}
+            {navTab('funder-basket', 'Funders',      funder.basket.length)}
+          </div>
+        </div>
+
+        {navTab('guide', 'Guide', 0)}
+
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span style={{ fontSize: '.75rem', color: '#475569' }} title={authState.email}>
             {authState.name || authState.email}
@@ -78,6 +100,7 @@ export default function App() {
           <a href="/auth/logout" style={{ fontSize: '.8rem', color: '#64748b', textDecoration: 'none' }}>Sign out</a>
         </div>
       </nav>
+
       {page === 'overview'      && <Overview setPage={setPage} />}
       {page === 'institutions'  && <Institutions instData={instData} setInstData={setInstData} basket={inst.basket} addToBasket={inst.addToBasket} projectId={authState.project_id} />}
       {page === 'funders'       && <Funders funderData={funderData} setFunderData={setFunderData} basket={funder.basket} addToBasket={funder.addToBasket} projectId={authState.project_id} />}
