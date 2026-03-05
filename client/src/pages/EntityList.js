@@ -54,8 +54,8 @@ export default function EntityList({
   const fetchData = (yf, yt, sq, sf) => {
     setLoading(true); setPermErr(false); setDisplayLimit(DEFAULT_LIMIT);
     const url = sq.trim()
-      ? `${apiSearch}?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=1000`
-      : `${apiTop}?year_from=${yf}&year_to=${yt}&limit=1000`;
+      ? `${apiSearch}?q=${encodeURIComponent(sq)}&field=${sf}&year_from=${yf}&year_to=${yt}&limit=5000`
+      : `${apiTop}?year_from=${yf}&year_to=${yt}&limit=5000`;
     apiFetch(url)
       .then(d => {
         setEntityData({ rows: d?.rows ?? [], yearFrom: yf, yearTo: yt, bytesProcessed: d?.bytes_processed ?? null });

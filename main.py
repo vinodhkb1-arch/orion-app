@@ -247,7 +247,7 @@ def auth_me(request: Request):
 @app.get("/api/institutions/top")
 def institutions_top(
     request: Request,
-    limit: int = Query(default=1000, ge=1, le=5000),
+    limit: int = Query(default=5000, ge=1, le=50000),
     year_from: int = Query(default=2000),
     year_to: int = Query(default=2025),
 ):
@@ -276,7 +276,7 @@ def institutions_search(
     request: Request,
     q: str = Query(default=""),
     field: str = Query(default="name"),
-    limit: int = Query(default=1000, ge=1, le=5000),
+    limit: int = Query(default=5000, ge=1, le=50000),
     year_from: int = Query(default=2000),
     year_to: int = Query(default=2025),
 ):
@@ -326,7 +326,7 @@ def institution_trends(request: Request, institution_id: int):
 @app.get("/api/funders/top")
 def funders_top(
     request: Request,
-    limit: int = Query(default=1000, ge=1, le=5000),
+    limit: int = Query(default=5000, ge=1, le=50000),
     year_from: int = Query(default=2000),
     year_to: int = Query(default=2025),
 ):
@@ -351,7 +351,7 @@ def funders_search(
     request: Request,
     q: str = Query(default=""),
     field: str = Query(default="name"),
-    limit: int = Query(default=1000, ge=1, le=5000),
+    limit: int = Query(default=5000, ge=1, le=50000),
     year_from: int = Query(default=2000),
     year_to: int = Query(default=2025),
 ):
@@ -396,7 +396,7 @@ class InstBasketRequest(BaseModel):
     institution_ids: List[int]
     year_from: int = 2000
     year_to: int = 2025
-    limit: int = 1000
+    limit: int = 5000
 
 @app.post("/api/basket/institutions/works")
 def basket_inst_works(req: InstBasketRequest, request: Request):
@@ -471,7 +471,7 @@ class FunderBasketRequest(BaseModel):
     funder_ids: List[int]
     year_from: int = 2000
     year_to: int = 2025
-    limit: int = 1000
+    limit: int = 5000
 
 @app.post("/api/basket/funders/works")
 def basket_funder_works(req: FunderBasketRequest, request: Request):

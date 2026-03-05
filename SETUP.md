@@ -77,15 +77,48 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 ---
 
-## Step 4 — Deploy
+## Step 4 — First deploy
 
 ```bash
 bash DEPLOY.sh
 ```
 
-Cloud Build will clone your GitHub repo, build the Docker image, push it to Container Registry, and deploy to Cloud Run. Logs stream directly in your terminal.
+Cloud Build will build the Docker image, push it to Container Registry, and deploy to Cloud Run. Logs stream directly in your terminal.
 
-To deploy a new version in future, just push your changes to GitHub and run `bash DEPLOY.sh` again.
+---
+
+## Day-to-day deploying
+
+**First time you open Cloud Shell** (one-time setup — makes Cloud Shell always open in the right place):
+
+```bash
+git clone https://github.com/jpbascur/orion-app.git
+cd orion-app
+echo 'cd ~/orion-app && git checkout dev 2>/dev/null' >> ~/.bashrc
+```
+
+**Every deploy after that** — just pull and run, no need to reclone:
+
+```bash
+git pull && bash DEPLOY.sh --dev
+```
+
+**To deploy main (production):**
+
+```bash
+git checkout main && git pull && bash DEPLOY.sh
+```
+
+**To switch back to dev after:**
+
+```bash
+git checkout dev
+```
+
+> **Why not `rm -rf` + `git clone` each time?**
+> It doesn't help — Docker layer caching happens on Cloud Build's remote VMs, not in
+> your local Cloud Shell. Recloning just wastes 30–60 seconds uploading a fresh build
+> context. `git pull` updates your files in place with no subdirectory created.
 
 ---
 

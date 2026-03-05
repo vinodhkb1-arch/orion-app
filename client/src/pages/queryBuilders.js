@@ -152,7 +152,7 @@ const FUNDER_FIELD_MAP = {
  * Mirrors the backend /api/institutions/search (or /top when q is empty).
  * q='' → top institutions by works_count; otherwise LIKE filter on `field`.
  */
-export function buildInstSearchQuery(q, field, yf, yt, limit = 1000) {
+export function buildInstSearchQuery(q, field, yf, yt) {
   const col   = INST_FIELD_MAP[field] ?? 'i.institution';
   const where = q.trim()
     ? `WHERE LOWER(${col}) LIKE '%${q.toLowerCase().replace(/'/g, "\\'")}%'`
@@ -166,6 +166,7 @@ ${desc}
 --
 -- Returns the institutions shown in the Institutions tab for the
 -- current search, ordered by works count in the given year range.
+-- (No row limit — fetch all matching results.)
 
 SELECT
     i.institution_id,
@@ -183,14 +184,13 @@ LEFT JOIN \`${ORION_SOURCE}.work\` w
    AND w.pub_year BETWEEN ${yf} AND ${yt}
 ${where}
 GROUP BY i.institution_id, i.institution, i.country_iso_alpha2_code, it.institution_type
-ORDER BY works_count DESC
-LIMIT ${limit}`;
+ORDER BY works_count DESC`;
 }
 
 /**
  * Mirrors the backend /api/funders/search (or /top when q is empty).
  */
-export function buildFunderSearchQuery(q, field, yf, yt, limit = 1000) {
+export function buildFunderSearchQuery(q, field, yf, yt) {
   const col   = FUNDER_FIELD_MAP[field] ?? 'f.funder';
   const where = q.trim()
     ? `WHERE LOWER(${col}) LIKE '%${q.toLowerCase().replace(/'/g, "\\'")}%'`
@@ -204,6 +204,7 @@ ${desc}
 --
 -- Returns the funders shown in the Funders tab for the
 -- current search, ordered by works count in the given year range.
+-- (No row limit — fetch all matching results.)
 
 SELECT
     f.funder_id,
@@ -219,8 +220,7 @@ LEFT JOIN \`${ORION_SOURCE}.work\` w
    AND w.pub_year BETWEEN ${yf} AND ${yt}
 ${where}
 GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code, f.description
-ORDER BY works_count DESC
-LIMIT ${limit}`;
+ORDER BY works_count DESC`;
 }
 
 // ── Shared components ─────────────────────────────────────────────────────────

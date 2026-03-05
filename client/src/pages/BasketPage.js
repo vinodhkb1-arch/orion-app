@@ -68,7 +68,7 @@ export default function BasketPage({
     [`${type === 'institutions' ? 'institution' : 'funder'}_ids`]: ids,
     year_from: yf,
     year_to: yt,
-    limit: 1000,
+    limit: 5000,
   });
 
   const postOpts = (yf, yt) => ({
