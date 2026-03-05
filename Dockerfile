@@ -5,8 +5,8 @@ WORKDIR /app/client
 # Copy manifests first so Docker can cache the npm install layer.
 # This layer is only invalidated when package.json or package-lock.json changes,
 # not on every source file edit.
-COPY client/package.json client/package-lock.json ./
-RUN npm ci --prefer-offline
+COPY client/package.json ./
+RUN npm install
 
 COPY client/ ./
 RUN npm run build
