@@ -29,6 +29,14 @@ export default function App() {
     funder.removeFromBasket(id);
     setFunderBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
   };
+  const clearInst = () => {
+    inst.clearBasket();
+    setInstBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
+  };
+  const clearFunder = () => {
+    funder.clearBasket();
+    setFunderBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
+  };
 
   useEffect(() => {
     fetch('/auth/me')
@@ -104,8 +112,8 @@ export default function App() {
       {page === 'overview'      && <Overview setPage={setPage} />}
       {page === 'institutions'  && <Institutions instData={instData} setInstData={setInstData} basket={inst.basket} addToBasket={inst.addToBasket} projectId={authState.project_id} />}
       {page === 'funders'       && <Funders funderData={funderData} setFunderData={setFunderData} basket={funder.basket} addToBasket={funder.addToBasket} projectId={authState.project_id} />}
-      {page === 'inst-basket'   && <InstBasket basket={inst.basket} removeFromBasket={removeInst} basketData={instBasketData} setBasketData={setInstBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} setPage={setPage} projectId={authState.project_id} />}
-      {page === 'funder-basket' && <FunderBasket basket={funder.basket} removeFromBasket={removeFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} setPage={setPage} projectId={authState.project_id} />}
+      {page === 'inst-basket'   && <InstBasket basket={inst.basket} removeFromBasket={removeInst} clearBasket={clearInst} basketData={instBasketData} setBasketData={setInstBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} setPage={setPage} projectId={authState.project_id} />}
+      {page === 'funder-basket' && <FunderBasket basket={funder.basket} removeFromBasket={removeFunder} clearBasket={clearFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} setPage={setPage} projectId={authState.project_id} />}
       {page === 'guide'         && <Guide />}
     </>
   );

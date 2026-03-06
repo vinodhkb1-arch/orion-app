@@ -18,6 +18,7 @@ import { QueryModal, ResultTable, PermissionError, CollapsibleSection } from './
 export default function BasketPage({
   basket,
   removeFromBasket,
+  clearBasket,
   basketData,
   setBasketData,
   addInstToBasket,
@@ -165,6 +166,17 @@ export default function BasketPage({
                 <button className="btn danger" style={{ padding: '.25rem .6rem', fontSize: '.75rem' }} onClick={() => removeFromBasket(b[idKey])}>Remove</button>
               </div>
             ))}
+            {basket.length > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '.5rem' }}>
+                <button
+                  className="btn danger"
+                  style={{ fontSize: '.75rem', padding: '.3rem .75rem' }}
+                  onClick={() => { if (window.confirm(`Remove all ${basket.length} items from basket?`)) clearBasket(); }}
+                >
+                  Remove all ({basket.length})
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Year controls */}

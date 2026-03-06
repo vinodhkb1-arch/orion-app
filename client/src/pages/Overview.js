@@ -1,11 +1,11 @@
 import React from 'react';
 
 const NAV_CARDS = [
-  { key: 'institutions',   icon: '🏛',  label: 'Institutions'       },
-  { key: 'funders',        icon: '💰',  label: 'Funders'            },
-  { key: 'inst-basket',    icon: '🛒',  label: 'Institution Basket' },
-  { key: 'funder-basket',  icon: '🛒',  label: 'Funder Basket'      },
-  { key: 'guide',          icon: '📖',  label: 'Guide'              },
+  { key: 'institutions',   icon: '🏛',  label: 'Institutions',  group: 'Search'  },
+  { key: 'funders',        icon: '💰',  label: 'Funders',       group: 'Search'  },
+  { key: 'inst-basket',    icon: '🛒',  label: 'Institutions',  group: 'Basket'  },
+  { key: 'funder-basket',  icon: '🛒',  label: 'Funders',       group: 'Basket'  },
+  { key: 'guide',          icon: '📖',  label: 'Guide',         group: null      },
 ];
 
 export default function Overview({ setPage }) {
@@ -20,7 +20,7 @@ export default function Overview({ setPage }) {
         </a>
       </p>
       <div className="cards">
-        {NAV_CARDS.map(({ key, icon, label }) => (
+        {NAV_CARDS.map(({ key, icon, label, group }) => (
           <button
             key={key}
             className="card"
@@ -28,7 +28,7 @@ export default function Overview({ setPage }) {
             onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setPage(key)}
           >
             <div className="val">{icon}</div>
-            <div className="lbl">{label}</div>
+            <div className="lbl">{group ? <><span style={{fontSize:'.65em',color:'#475569',display:'block',marginBottom:'.1em'}}>{group}</span>{label}</> : label}</div>
           </button>
         ))}
       </div>

@@ -135,6 +135,20 @@ export default function EntityList({
               <button className="btn ghost" onClick={() => setMinimized(false)}>Show table</button>
             </div>
           : <div className="table-wrap">
+              <div className="tbl-footer" style={{ marginBottom: '.5rem', marginTop: 0 }}>
+                <span>Showing {visibleRows.length} of {rows.length} results</span>
+                <div className="tbl-expand">
+                  <button
+                    className="btn ghost"
+                    onClick={() => {
+                      const newItems = rows.filter(r => !basket.some(b => b[idKey] === r[idKey]));
+                      newItems.forEach(r => addToBasket(r));
+                    }}
+                    title="Add all results to basket (not just visible rows)"
+                  >+ Add all {rows.length.toLocaleString()} to basket</button>
+                  <button className="btn ghost" onClick={() => setMinimized(true)} title="Minimize table">− Minimize</button>
+                </div>
+              </div>
               <table>
                 <thead><tr>
                   <th>#</th>

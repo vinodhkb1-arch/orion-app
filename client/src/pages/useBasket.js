@@ -38,5 +38,9 @@ export default function useBasket(storageKey, idKey, pickFields) {
     setBasket(prev => prev.filter(b => b[idKey] !== id));
   };
 
-  return { basket, addToBasket, removeFromBasket };
+  const clearBasket = () => {
+    setBasket([]);
+  };
+
+  return { basket, addToBasket, removeFromBasket, clearBasket };
 }
