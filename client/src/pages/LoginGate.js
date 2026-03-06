@@ -3,14 +3,15 @@ import React, { useState } from 'react';
 const SERVICE_ACCOUNT = '112226578999-compute@developer.gserviceaccount.com';
 
 export default function LoginGate() {
-  const [projectId, setProjectId] = useState('');
-  const [error, setError]         = useState('');
+  const [projectId, setProjectId]   = useState('');
+  const [error, setError]           = useState('');
+  const [showSetup, setShowSetup]   = useState(false);
 
   const handleLogin = () => {
     const pid = projectId.trim();
     if (!pid) { setError('Please enter your GCP Project ID.'); return; }
     if (!/^[a-z][a-z0-9\-]{4,28}[a-z0-9]$/.test(pid)) {
-      setError('Invalid project ID. Must be 6–30 characters: lowercase letters, digits, and hyphens only, starting with a letter.');
+      setError('That doesn\'t look like a valid Project ID. It should be 6–30 characters: lowercase letters, digits, and hyphens, starting with a letter.');
       return;
     }
     window.location.href = `/auth/login?project_id=${encodeURIComponent(pid)}`;
@@ -26,7 +27,7 @@ export default function LoginGate() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f1117', padding: '1.5rem' }}>
-      <div style={{ width: '100%', maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ width: '100%', maxWidth: '460px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
         {/* ── Header ── */}
         <div style={{ textAlign: 'center', marginBottom: '.5rem' }}>
@@ -38,23 +39,40 @@ export default function LoginGate() {
         {/* ── Sign-in card ── */}
         <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '12px', padding: '1.5rem' }}>
 
+          <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: '1.25rem', margin: '0 0 1.25rem' }}>
+            ORION queries public research data on your behalf using{' '}
+            <a href="https://cloud.google.com/bigquery" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>Google BigQuery</a>.
+            You need a <strong style={{ color: '#e2e8f0' }}>GCP Project ID</strong> so queries are billed to your account —
+            the first <strong style={{ color: '#e2e8f0' }}>1 TB/month</strong> is free and most searches cost far less.
+          </p>
+
           <label style={{ display: 'block', fontSize: '.8rem', color: '#64748b', marginBottom: '.4rem' }}>
-            Your existing GCP Project ID
+            GCP Project ID
           </label>
           <input
             type="text"
-            placeholder="my-gcp-project-123"
+            placeholder="my-project-123456"
             value={projectId}
             onChange={e => { setProjectId(e.target.value); setError(''); }}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
             style={{ width: '100%', background: '#0f1117', border: '1px solid #2d3148', borderRadius: '6px', color: '#e2e8f0', padding: '.6rem .85rem', fontSize: '.9rem', outline: 'none', boxSizing: 'border-box', marginBottom: '.5rem' }}
           />
-          <p style={{ color: '#475569', fontSize: '.75rem', lineHeight: 1.6, marginBottom: '1rem' }}>
-            This must be a GCP project that <strong style={{ color: '#64748b' }}>already exists</strong> — you are not creating a project here.
-            BigQuery costs for your queries will be billed to this project.
+
+          <p style={{ color: '#334155', fontSize: '.73rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
+            Not sure where to find it?{' '}
+            <button
+              onClick={() => setShowSetup(s => !s)}
+              style={{ background: 'none', border: 'none', color: '#475569', fontSize: '.73rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+            >
+              {showSetup ? 'Hide help' : 'Show me how →'}
+            </button>
           </p>
 
-          {error && <div style={{ color: '#f87171', fontSize: '.8rem', marginBottom: '1rem', padding: '.5rem .75rem', background: '#2d1515', border: '1px solid #7f1d1d', borderRadius: '6px' }}>{error}</div>}
+          {error && (
+            <div style={{ color: '#f87171', fontSize: '.8rem', marginBottom: '1rem', padding: '.5rem .75rem', background: '#2d1515', border: '1px solid #7f1d1d', borderRadius: '6px' }}>
+              {error}
+            </div>
+          )}
 
           <button
             onClick={handleLogin}
@@ -65,82 +83,74 @@ export default function LoginGate() {
           </button>
         </div>
 
-        {/* ── First-time setup block (always open) ── */}
-        <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '12px', padding: '1.5rem' }}>
+        {/* ── Setup help (progressive disclosure) ── */}
+        {showSetup && (
+          <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '12px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '1rem' }}>
-            <span style={{ fontSize: '1rem' }}>⚙️</span>
-            <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#94a3b8' }}>Important: first-time setup</span>
-          </div>
-
-          <p style={{ fontSize: '.8rem', color: '#64748b', lineHeight: 1.7, marginBottom: '1.25rem' }}>
-            ORION needs a GCP project to bill your BigQuery queries to.
-            If you don't have one, <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>create a free GCP project ↗</a>.
-            The first <strong style={{ color: '#94a3b8' }}>1 TB/month</strong> of queries is free — most users pay nothing.
-          </p>
-
-          {/* Step 0: find project ID */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#64748b', marginBottom: '.5rem' }}>
-              How to find your Project ID
-            </div>
-            <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '.78rem', color: '#475569', lineHeight: 2 }}>
-              <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>console.cloud.google.com ↗</a></li>
-              <li>Click the project dropdown at the very top of the page</li>
-              <li>Copy the <strong style={{ color: '#94a3b8' }}>ID</strong> column (not the name) — it looks like <code style={{ color: '#a78bfa' }}>my-project-123456</code></li>
-            </ol>
-          </div>
-
-          <div style={{ borderTop: '1px solid #2d3148', margin: '0 0 1.25rem' }} />
-
-          {/* Step 1: Enable BigQuery API */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#64748b', marginBottom: '.5rem' }}>
-              Step 1 — Enable the BigQuery API on your project
-            </div>
-            <p style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.7, margin: '0 0 .4rem' }}>
-              BigQuery must be activated on your project before ORION can use it.
-            </p>
-            <a
-              href={bqApiUrl}
-              target="_blank" rel="noreferrer"
-              style={{ display: 'inline-block', fontSize: '.78rem', color: '#7c8cff' }}
-            >
-              Enable BigQuery API{projectId.trim() ? ` on ${projectId.trim()}` : ''} ↗
-            </a>
-          </div>
-
-          {/* Step 2: Grant IAM role */}
-          <div>
-            <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#64748b', marginBottom: '.5rem' }}>
-              Step 2 — Grant ORION permission to run queries on your project
-            </div>
-            <p style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.7, margin: '0 0 .75rem' }}>
-              ORION runs queries using a shared service account. You need to give it the
-              {' '}<strong style={{ color: '#94a3b8' }}>BigQuery Job User</strong> role on your project — this only allows
-              submitting query jobs, it does <strong style={{ color: '#94a3b8' }}>not</strong> give access to any of your data.
+            <p style={{ fontSize: '.8rem', color: '#64748b', lineHeight: 1.7, margin: 0 }}>
+              Don't have a GCP project yet?{' '}
+              <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>
+                Create one for free ↗
+              </a>
+              {' '}— it only takes a minute.
             </p>
 
-            <div style={{ background: '#0f1117', border: '1px solid #2d3148', borderRadius: '8px', padding: '.85rem 1rem', marginBottom: '.75rem' }}>
-              <div style={{ marginBottom: '.5rem' }}>
-                <span style={{ fontSize: '.72rem', color: '#334155', display: 'block', marginBottom: '.2rem' }}>New principal (copy this exactly):</span>
-                <code style={{ color: '#a78bfa', fontSize: '.78rem', userSelect: 'all', wordBreak: 'break-all' }}>{SERVICE_ACCOUNT}</code>
-              </div>
-              <div>
-                <span style={{ fontSize: '.72rem', color: '#334155', display: 'block', marginBottom: '.2rem' }}>Role:</span>
-                <code style={{ color: '#4ade80', fontSize: '.78rem' }}>BigQuery Job User</code>
-              </div>
+            {/* Find project ID */}
+            <div>
+              <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#64748b', marginBottom: '.5rem' }}>Finding your Project ID</div>
+              <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '.78rem', color: '#475569', lineHeight: 2.1 }}>
+                <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>console.cloud.google.com ↗</a></li>
+                <li>Click the <strong style={{ color: '#94a3b8' }}>project dropdown</strong> at the top of the page</li>
+                <li>Copy the value in the <strong style={{ color: '#94a3b8' }}>ID</strong> column — it looks like <code style={{ color: '#a78bfa' }}>my-project-123456</code></li>
+              </ol>
             </div>
 
-            <ol style={{ margin: '0 0 .5rem', paddingLeft: '1.25rem', fontSize: '.78rem', color: '#475569', lineHeight: 2 }}>
-              <li>Open <a href={iamUrl} target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>IAM & Admin → IAM{projectId.trim() ? ` for ${projectId.trim()}` : ''} ↗</a></li>
-              <li>Click <strong style={{ color: '#94a3b8' }}>Grant Access</strong></li>
-              <li>Paste the service account address above as the new principal</li>
-              <li>Select the role <strong style={{ color: '#94a3b8' }}>BigQuery Job User</strong></li>
-              <li>Click <strong style={{ color: '#94a3b8' }}>Save</strong></li>
-            </ol>
+            <div style={{ borderTop: '1px solid #2d3148' }} />
+
+            {/* One-time setup */}
+            <div>
+              <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#64748b', marginBottom: '.35rem' }}>One-time setup (first use only)</div>
+              <p style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.7, margin: '0 0 .85rem' }}>
+                Before your first query, you need to do two quick things in Google Cloud. You only do this once per project.
+              </p>
+
+              {/* Step 1 */}
+              <div style={{ display: 'flex', gap: '.75rem', marginBottom: '.85rem' }}>
+                <div style={{ flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%', background: '#2d3148', color: '#7c8cff', fontSize: '.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>1</div>
+                <div style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.7 }}>
+                  <strong style={{ color: '#94a3b8' }}>Enable BigQuery</strong> on your project:{' '}
+                  <a href={bqApiUrl} target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>
+                    Enable BigQuery API{projectId.trim() ? ` on ${projectId.trim()}` : ''} ↗
+                  </a>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div style={{ display: 'flex', gap: '.75rem' }}>
+                <div style={{ flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%', background: '#2d3148', color: '#7c8cff', fontSize: '.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>2</div>
+                <div style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.7 }}>
+                  <strong style={{ color: '#94a3b8' }}>Give ORION permission to run queries.</strong>{' '}
+                  Open{' '}
+                  <a href={iamUrl} target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>
+                    IAM &amp; Admin{projectId.trim() ? ` for ${projectId.trim()}` : ''} ↗
+                  </a>
+                  {', '}click <strong style={{ color: '#94a3b8' }}>Grant Access</strong>, and add:
+                  <div style={{ background: '#0f1117', border: '1px solid #2d3148', borderRadius: '7px', padding: '.7rem .9rem', margin: '.6rem 0', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+                    <div>
+                      <span style={{ fontSize: '.7rem', color: '#334155', display: 'block', marginBottom: '.15rem' }}>New principal</span>
+                      <code style={{ color: '#a78bfa', fontSize: '.77rem', userSelect: 'all', wordBreak: 'break-all' }}>{SERVICE_ACCOUNT}</code>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '.7rem', color: '#334155', display: 'block', marginBottom: '.15rem' }}>Role</span>
+                      <code style={{ color: '#4ade80', fontSize: '.77rem' }}>BigQuery Job User</code>
+                    </div>
+                  </div>
+                  This only allows ORION to submit queries — it <strong style={{ color: '#94a3b8' }}>cannot</strong> read or modify anything in your project.
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Footer ── */}
         <p style={{ color: '#2d3148', fontSize: '.7rem', textAlign: 'center', lineHeight: 1.7 }}>

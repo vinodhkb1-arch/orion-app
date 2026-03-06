@@ -1,12 +1,23 @@
 import React, { useState } from 'react';
 
 function Section({ title, children }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div style={{ marginBottom: '2.5rem' }}>
-      <div style={{ fontSize: '.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.75rem' }}>
-        {title}
-      </div>
-      {children}
+    <div style={{ marginBottom: '1rem', background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.75rem', padding: '1rem 1.25rem', textAlign: 'left' }}
+      >
+        <span style={{ fontSize: '.75rem', color: '#475569', flexShrink: 0, transition: 'transform .2s', display: 'inline-block', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+        <span style={{ fontSize: '.8rem', fontWeight: 700, color: open ? '#94a3b8' : '#64748b', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+          {title}
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: '0 1.25rem 1.25rem' }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
