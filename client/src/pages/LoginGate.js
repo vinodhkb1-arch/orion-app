@@ -11,7 +11,7 @@ export default function LoginGate() {
     const pid = projectId.trim();
     if (!pid) { setError('Please enter your GCP Project ID.'); return; }
     if (!/^[a-z][a-z0-9\-]{4,28}[a-z0-9]$/.test(pid)) {
-      setError('That doesn\'t look like a valid Project ID. It should be 6–30 characters: lowercase letters, digits, and hyphens, starting with a letter.');
+      setError("That doesn't look like a valid Project ID. It should be 6–30 characters: lowercase letters, digits, and hyphens, starting with a letter.");
       return;
     }
     window.location.href = `/auth/login?project_id=${encodeURIComponent(pid)}`;
@@ -27,7 +27,7 @@ export default function LoginGate() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f1117', padding: '1.5rem' }}>
-      <div style={{ width: '100%', maxWidth: '460px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ width: '100%', maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
         {/* ── Header ── */}
         <div style={{ textAlign: 'center', marginBottom: '.5rem' }}>
@@ -39,14 +39,18 @@ export default function LoginGate() {
         {/* ── Sign-in card ── */}
         <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '12px', padding: '1.5rem' }}>
 
-          <p style={{ fontSize: '.875rem', color: '#94a3b8', lineHeight: 1.7, marginBottom: '1.25rem', margin: '0 0 1.25rem' }}>
-            ORION queries public research data on your behalf using{' '}
-            <a href="https://cloud.google.com/bigquery" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>Google BigQuery</a>.
-            You need a <strong style={{ color: '#e2e8f0' }}>GCP Project ID</strong> so queries are billed to your account —
-            the first <strong style={{ color: '#e2e8f0' }}>1 TB/month</strong> is free and most searches cost far less.
-          </p>
+          {/* Requirements notice */}
+          <div style={{ background: '#0f1117', border: '1px solid #2d3148', borderRadius: '8px', padding: '.85rem 1rem', marginBottom: '1.25rem' }}>
+            <p style={{ fontSize: '.8rem', color: '#94a3b8', lineHeight: 1.75, margin: 0 }}>
+              To use ORION you need a <strong style={{ color: '#e2e8f0' }}>Google Cloud (GCP) project</strong> — both to identify yourself and to bill the cost of database queries to your account.
+              The first <strong style={{ color: '#e2e8f0' }}>1 TB/month</strong> of queries is free, and typical ORION searches use a small fraction of that.
+            </p>
+            <p style={{ fontSize: '.8rem', color: '#64748b', lineHeight: 1.75, margin: '.6rem 0 0' }}>
+              Before signing in for the first time you also need to <strong style={{ color: '#94a3b8' }}>configure your project</strong> so ORION has permission to run queries on your behalf.
+            </p>
+          </div>
 
-          <label style={{ display: 'block', fontSize: '.8rem', color: '#64748b', marginBottom: '.4rem' }}>
+          <label style={{ display: 'block', fontSize: '.8rem', color: '#94a3b8', marginBottom: '.4rem', fontWeight: 600 }}>
             GCP Project ID
           </label>
           <input
@@ -55,49 +59,63 @@ export default function LoginGate() {
             value={projectId}
             onChange={e => { setProjectId(e.target.value); setError(''); }}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            style={{ width: '100%', background: '#0f1117', border: '1px solid #2d3148', borderRadius: '6px', color: '#e2e8f0', padding: '.6rem .85rem', fontSize: '.9rem', outline: 'none', boxSizing: 'border-box', marginBottom: '.5rem' }}
+            style={{ width: '100%', background: '#0f1117', border: '1px solid #2d3148', borderRadius: '6px', color: '#e2e8f0', padding: '.6rem .85rem', fontSize: '.9rem', outline: 'none', boxSizing: 'border-box', marginBottom: '.75rem' }}
           />
 
-          <p style={{ color: '#334155', fontSize: '.73rem', lineHeight: 1.6, margin: '0 0 1rem' }}>
-            Not sure where to find it?{' '}
-            <button
-              onClick={() => setShowSetup(s => !s)}
-              style={{ background: 'none', border: 'none', color: '#475569', fontSize: '.73rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
-            >
-              {showSetup ? 'Hide help' : 'Show me how →'}
-            </button>
-          </p>
-
           {error && (
-            <div style={{ color: '#f87171', fontSize: '.8rem', marginBottom: '1rem', padding: '.5rem .75rem', background: '#2d1515', border: '1px solid #7f1d1d', borderRadius: '6px' }}>
+            <div style={{ color: '#f87171', fontSize: '.8rem', marginBottom: '.75rem', padding: '.5rem .75rem', background: '#2d1515', border: '1px solid #7f1d1d', borderRadius: '6px' }}>
               {error}
             </div>
           )}
 
           <button
             onClick={handleLogin}
-            style={{ width: '100%', background: '#fff', color: '#0f1117', border: 'none', borderRadius: '6px', padding: '.65rem', fontSize: '.95rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.6rem', boxSizing: 'border-box' }}
+            style={{ width: '100%', background: '#fff', color: '#0f1117', border: 'none', borderRadius: '6px', padding: '.65rem', fontSize: '.95rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.6rem', boxSizing: 'border-box', marginBottom: '1rem' }}
           >
             <GoogleIcon />
             Sign in with Google
+          </button>
+
+          {/* Prominent setup toggle */}
+          <button
+            onClick={() => setShowSetup(s => !s)}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: showSetup ? '#2d3148' : '#1e2235',
+              border: `1px solid ${showSetup ? '#4a5180' : '#2d3148'}`,
+              borderRadius: '8px', padding: '.65rem 1rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <span style={{ fontSize: '.95rem' }}>⚙️</span>
+              <span style={{ fontSize: '.82rem', fontWeight: 700, color: '#94a3b8' }}>
+                {showSetup ? 'Hide setup instructions' : 'Need help? — Setup instructions'}
+              </span>
+            </span>
+            <span style={{ color: '#475569', fontSize: '.85rem', transition: 'transform .2s', display: 'inline-block', transform: showSetup ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
           </button>
         </div>
 
         {/* ── Setup help (progressive disclosure) ── */}
         {showSetup && (
-          <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '12px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '12px', overflow: 'hidden' }}>
 
-            <p style={{ fontSize: '.8rem', color: '#64748b', lineHeight: 1.7, margin: 0 }}>
-              Don't have a GCP project yet?{' '}
-              <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>
-                Create one for free ↗
-              </a>
-              {' '}— it only takes a minute.
-            </p>
+            {/* Part A: Create or find your project */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #2d3148' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.75rem' }}>
+                <span style={{ background: '#7c8cff', color: '#0f1117', fontSize: '.7rem', fontWeight: 800, width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>A</span>
+                <span style={{ fontSize: '.8rem', fontWeight: 700, color: '#94a3b8' }}>Get a GCP project</span>
+              </div>
 
-            {/* Find project ID */}
-            <div>
-              <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#64748b', marginBottom: '.5rem' }}>Finding your Project ID</div>
+              <p style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.7, margin: '0 0 .75rem' }}>
+                If you don't have a GCP project yet,{' '}
+                <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>create one for free ↗</a>
+                {' '}— it takes about a minute.
+              </p>
+
+              <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#64748b', marginBottom: '.4rem' }}>Finding your Project ID</div>
               <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '.78rem', color: '#475569', lineHeight: 2.1 }}>
                 <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>console.cloud.google.com ↗</a></li>
                 <li>Click the <strong style={{ color: '#94a3b8' }}>project dropdown</strong> at the top of the page</li>
@@ -105,17 +123,19 @@ export default function LoginGate() {
               </ol>
             </div>
 
-            <div style={{ borderTop: '1px solid #2d3148' }} />
+            {/* Part B: Configure the project */}
+            <div style={{ padding: '1.25rem 1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.75rem' }}>
+                <span style={{ background: '#7c8cff', color: '#0f1117', fontSize: '.7rem', fontWeight: 800, width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>B</span>
+                <span style={{ fontSize: '.8rem', fontWeight: 700, color: '#94a3b8' }}>Configure your project to work with ORION <span style={{ fontWeight: 400, color: '#475569' }}>(one-time)</span></span>
+              </div>
 
-            {/* One-time setup */}
-            <div>
-              <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#64748b', marginBottom: '.35rem' }}>One-time setup (first use only)</div>
-              <p style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.7, margin: '0 0 .85rem' }}>
-                Before your first query, you need to do two quick things in Google Cloud. You only do this once per project.
+              <p style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.7, margin: '0 0 1rem' }}>
+                Do these two steps once per project before your first query. They allow ORION to run BigQuery jobs billed to your project.
               </p>
 
               {/* Step 1 */}
-              <div style={{ display: 'flex', gap: '.75rem', marginBottom: '.85rem' }}>
+              <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1rem' }}>
                 <div style={{ flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%', background: '#2d3148', color: '#7c8cff', fontSize: '.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>1</div>
                 <div style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.7 }}>
                   <strong style={{ color: '#94a3b8' }}>Enable BigQuery</strong> on your project:{' '}

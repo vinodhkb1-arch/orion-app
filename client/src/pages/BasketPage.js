@@ -60,7 +60,7 @@ export default function BasketPage({
   const setWorksResult   = (r, yf, yt) => setBasketData(d => ({ ...d, worksResult:   r, worksYF:   yf, worksYT:   yt }));
   const setCoInstResult  = (r, yf, yt) => setBasketData(d => ({ ...d, coInstResult:  r, coInstYF:  yf, coInstYT:  yt }));
   const setCoFundResult  = (r, yf, yt) => setBasketData(d => ({ ...d, coFundResult:  r, coFundYF:  yf, coFundYT:  yt }));
-  const setTopicsResult  = (r, bp, yf, yt) => setBasketData(d => ({ ...d, topicsResult: r, topicsBP: bp, topicsYF: yf, topicsYT: yt }));
+  const setTopicsResult  = (r, bp, unc, yf, yt) => setBasketData(d => ({ ...d, topicsResult: r, topicsBP: bp, topicsUnclassified: unc, topicsYF: yf, topicsYT: yt }));
 
   // Also persist the year inputs so they survive tab switches.
   const applyYF = v => { setYF(v); setBasketData(d => ({ ...d, yearFrom: v })); };
@@ -120,7 +120,7 @@ export default function BasketPage({
     const yf = yearFrom, yt = yearTo;
     setTopicsLoading(true); setError(''); setPermError(false);
     apiFetch(`${apiBase}/topics`, postOpts(yf, yt))
-      .then(d => { if (d) setTopicsResult(d.rows, d.bytes_processed, yf, yt); })
+      .then(d => { if (d) setTopicsResult(d.rows, d.bytes_processed, d.unclassified_works ?? 0, yf, yt); })
       .catch(handleError)
       .finally(() => setTopicsLoading(false));
   };
@@ -379,7 +379,7 @@ export default function BasketPage({
                   <strong style={{ color: '#64748b' }}>CWTS openalex_2023nov_classification</strong>.
                   {' '}Proportion = basket works ÷ total cluster works within {tYF}–{tYT}.
                 </p>
-                <TopicsTable rows={topicsResult || []} loading={topicsLoading} />
+                <TopicsTable rows={topicsResult || []} loading={topicsLoading} unclassified={basketData.topicsUnclassified ?? 0} />
               </CollapsibleSection>
             );
           })()}

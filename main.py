@@ -560,7 +560,7 @@ def basket_inst_topics(req: InstBasketRequest, request: Request):
     session = require_auth(request)
     pid = session["project_id"]
     if not req.institution_ids:
-        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+        return cached({"rows": [], "unclassified_works": 0, "bytes_processed": 0}, CACHE_OFF)
     yf, yt, ids = req.year_from, req.year_to, req.institution_ids
     rows, bp = run_query(f"""
         WITH basket_works AS (
@@ -582,19 +582,30 @@ def basket_inst_topics(req: InstBasketRequest, request: Request):
             JOIN `{SOURCE}.work` w ON cl.work_id = w.work_id
             WHERE w.pub_year BETWEEN @year_from AND @year_to
             GROUP BY cl.micro_cluster_id
+        ),
+        classified_count AS (
+            SELECT COUNT(DISTINCT cl.work_id) AS n
+            FROM `{CLASSIFICATION}.clustering` cl
+            INNER JOIN basket_works bw ON cl.work_id = bw.work_id
+        ),
+        total_count AS (
+            SELECT COUNT(*) AS n FROM basket_works
         )
         SELECT
             bc.micro_cluster_id,
             mc.long_label,
             bc.basket_works_count,
             ct.total_works_in_cluster,
-            ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion
+            ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion,
+            (SELECT n FROM total_count) - (SELECT n FROM classified_count) AS unclassified_works
         FROM basket_clusters bc
         JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
         LEFT JOIN `{CLASSIFICATION}.micro_cluster` mc ON bc.micro_cluster_id = mc.micro_cluster_id
         ORDER BY bc.basket_works_count DESC
     """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
-    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+    unclassified = rows[0]["unclassified_works"] if rows else 0
+    clean_rows = [{k: v for k, v in r.items() if k != "unclassified_works"} for r in rows]
+    return cached({"rows": clean_rows, "unclassified_works": unclassified, "bytes_processed": bp}, CACHE_OFF)
 
 
 @app.post("/api/basket/funders/topics")
@@ -603,7 +614,7 @@ def basket_funder_topics(req: FunderBasketRequest, request: Request):
     session = require_auth(request)
     pid = session["project_id"]
     if not req.funder_ids:
-        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+        return cached({"rows": [], "unclassified_works": 0, "bytes_processed": 0}, CACHE_OFF)
     yf, yt, ids = req.year_from, req.year_to, req.funder_ids
     rows, bp = run_query(f"""
         WITH basket_works AS (
@@ -625,19 +636,30 @@ def basket_funder_topics(req: FunderBasketRequest, request: Request):
             JOIN `{SOURCE}.work` w ON cl.work_id = w.work_id
             WHERE w.pub_year BETWEEN @year_from AND @year_to
             GROUP BY cl.micro_cluster_id
+        ),
+        classified_count AS (
+            SELECT COUNT(DISTINCT cl.work_id) AS n
+            FROM `{CLASSIFICATION}.clustering` cl
+            INNER JOIN basket_works bw ON cl.work_id = bw.work_id
+        ),
+        total_count AS (
+            SELECT COUNT(*) AS n FROM basket_works
         )
         SELECT
             bc.micro_cluster_id,
             mc.long_label,
             bc.basket_works_count,
             ct.total_works_in_cluster,
-            ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion
+            ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion,
+            (SELECT n FROM total_count) - (SELECT n FROM classified_count) AS unclassified_works
         FROM basket_clusters bc
         JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
         LEFT JOIN `{CLASSIFICATION}.micro_cluster` mc ON bc.micro_cluster_id = mc.micro_cluster_id
         ORDER BY bc.basket_works_count DESC
     """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
-    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+    unclassified = rows[0]["unclassified_works"] if rows else 0
+    clean_rows = [{k: v for k, v in r.items() if k != "unclassified_works"} for r in rows]
+    return cached({"rows": clean_rows, "unclassified_works": unclassified, "bytes_processed": bp}, CACHE_OFF)
 
 
 # ── VOSviewer network export ──────────────────────────────────────────────────

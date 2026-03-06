@@ -16,10 +16,10 @@ export default function App() {
   const inst   = useBasket('orion_instBasket',  'institution_id', ['institution_id', 'name', 'country', 'type']);
   const funder = useBasket('orion_funderBasket', 'funder_id',      ['funder_id', 'name', 'country']);
 
-  const [instData,         setInstData]         = useState({ rows: [], yearFrom: 2020, yearTo: 2025, bytesProcessed: null });
-  const [funderData,       setFunderData]       = useState({ rows: [], yearFrom: 2020, yearTo: 2025, bytesProcessed: null });
-  const [instBasketData,   setInstBasketData]   = useState({ yearFrom: 2020, yearTo: 2025, worksResult: null, coInstResult: null, coFundResult: null });
-  const [funderBasketData, setFunderBasketData] = useState({ yearFrom: 2020, yearTo: 2025, worksResult: null, coInstResult: null, coFundResult: null });
+  const [instData,         setInstData]         = useState({ rows: [], yearFrom: 2015, yearTo: 2020, bytesProcessed: null });
+  const [funderData,       setFunderData]       = useState({ rows: [], yearFrom: 2015, yearTo: 2020, bytesProcessed: null });
+  const [instBasketData,   setInstBasketData]   = useState({ yearFrom: 2015, yearTo: 2020, worksResult: null, coInstResult: null, coFundResult: null });
+  const [funderBasketData, setFunderBasketData] = useState({ yearFrom: 2015, yearTo: 2020, worksResult: null, coInstResult: null, coFundResult: null });
 
   const removeInst = id => {
     inst.removeFromBasket(id);
