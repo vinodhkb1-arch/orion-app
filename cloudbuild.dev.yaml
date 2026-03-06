@@ -24,5 +24,3 @@ steps:
       - 'europe-west1'
       - '--allow-unauthenticated'
 
-images:
-  - 'gcr.io/$PROJECT_ID/orion-app-dev:latest'
