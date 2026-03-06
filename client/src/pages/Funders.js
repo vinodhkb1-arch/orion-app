@@ -8,13 +8,14 @@ const FIELDS = [
   { value: 'description', label: 'Description' },
 ];
 
-export default function Funders({ funderData, setFunderData, basket, addToBasket }) {
+export default function Funders({ funderData, setFunderData, basket, addToBasket, addManyToBasket }) {
   return (
     <EntityList
       entityData={funderData}
       setEntityData={setFunderData}
       basket={basket}
       addToBasket={addToBasket}
+      addManyToBasket={addManyToBasket}
       apiTop="/api/funders/top"
       apiSearch="/api/funders/search"
       idKey="funder_id"

@@ -1,10 +1,11 @@
 steps:
   # Build and push using kaniko — caches layers to GCS between builds.
-  - name: 'gcr.io/kaniko-project/executor:latest'
+  - name: 'gcr.io/kaniko-project/executor:v1.23.0'
     args:
       - '--destination=gcr.io/$PROJECT_ID/orion-app:latest'
       - '--cache=true'
       - '--cache-ttl=168h'
+      - '--cache-repo=gcr.io/$PROJECT_ID/orion-app/cache'
       - '--context=dir:///workspace'
 
   # Deploy to Cloud Run.
@@ -21,4 +22,3 @@ steps:
       - '--region'
       - 'europe-west1'
       - '--allow-unauthenticated'
-

@@ -27,6 +27,7 @@ export default function EntityList({
   setEntityData,
   basket,
   addToBasket,
+  addManyToBasket,
   apiTop,
   apiSearch,
   idKey,
@@ -140,10 +141,7 @@ export default function EntityList({
                 <div className="tbl-expand">
                   <button
                     className="btn ghost"
-                    onClick={() => {
-                      const newItems = rows.filter(r => !basket.some(b => b[idKey] === r[idKey]));
-                      newItems.forEach(r => addToBasket(r));
-                    }}
+                    onClick={() => addManyToBasket(rows)}
                     title="Add all results to basket (not just visible rows)"
                   >+ Add all {rows.length.toLocaleString()} to basket</button>
                   <button className="btn ghost" onClick={() => setMinimized(true)} title="Minimize table">− Minimize</button>

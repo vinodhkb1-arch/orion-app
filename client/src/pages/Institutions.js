@@ -9,13 +9,14 @@ const FIELDS = [
   { value: 'type',    label: 'Type' },
 ];
 
-export default function Institutions({ instData, setInstData, basket, addToBasket }) {
+export default function Institutions({ instData, setInstData, basket, addToBasket, addManyToBasket }) {
   return (
     <EntityList
       entityData={instData}
       setEntityData={setInstData}
       basket={basket}
       addToBasket={addToBasket}
+      addManyToBasket={addManyToBasket}
       apiTop="/api/institutions/top"
       apiSearch="/api/institutions/search"
       idKey="institution_id"
