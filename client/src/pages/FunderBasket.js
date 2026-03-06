@@ -4,6 +4,7 @@ import {
   buildFunderWorksQuery,
   buildFunderCoInstQuery,
   buildFunderCoFunderQuery,
+  buildFunderTopicsQuery,
 } from './BasketShared';
 
 export default function FunderBasket(props) {
@@ -17,6 +18,7 @@ export default function FunderBasket(props) {
         works:  buildFunderWorksQuery,
         coInst: buildFunderCoInstQuery,
         coFund: buildFunderCoFunderQuery,
+        topics: buildFunderTopicsQuery,
       }}
       title="Funder Basket"
       emptyHint={<>Empty. Go to <strong>Funders</strong> and click <strong>+</strong> on any row.</>}

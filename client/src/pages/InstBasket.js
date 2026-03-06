@@ -4,6 +4,7 @@ import {
   buildInstWorksQuery,
   buildInstCoInstQuery,
   buildInstCoFunderQuery,
+  buildInstTopicsQuery,
 } from './BasketShared';
 
 export default function InstBasket(props) {
@@ -17,6 +18,7 @@ export default function InstBasket(props) {
         works:  buildInstWorksQuery,
         coInst: buildInstCoInstQuery,
         coFund: buildInstCoFunderQuery,
+        topics: buildInstTopicsQuery,
       }}
       title="Institution Basket"
       emptyHint={<>Empty. Go to <strong>Institutions</strong> and click <strong>+</strong> on any row.</>}

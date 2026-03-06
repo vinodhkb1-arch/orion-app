@@ -223,4 +223,90 @@ GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code, f.description
 ORDER BY works_count DESC`;
 }
 
+// ── Topic / micro-cluster breakdown ──────────────────────────────────────────
+
+const CLASSIFICATION = 'cwts-leiden.openalex_2023nov_classification';
+
+export function buildInstTopicsQuery(ids, yf, yt) {
+  return `-- ORION export: micro-cluster topic breakdown for institution basket
+-- Institution IDs: ${ids.join(', ')}
+-- Year range: ${yf}–${yt}
+--
+-- Returns the micro-clusters (topics) from openalex_2023nov_classification
+-- that cover the basket's works, with absolute counts and proportions.
+-- Proportion = basket_works_count / total_works_in_cluster (within ${yf}–${yt}).
+
+WITH basket_works AS (
+    SELECT DISTINCT wai.work_id
+    FROM \`${ORION_SOURCE}.work_affiliation_institution\` wai
+    JOIN \`${ORION_SOURCE}.work\` w ON wai.work_id = w.work_id
+    WHERE wai.institution_id IN (${ids.join(', ')})
+      AND w.pub_year BETWEEN ${yf} AND ${yt}
+),
+basket_clusters AS (
+    SELECT cl.micro_cluster_id, COUNT(DISTINCT cl.work_id) AS basket_works_count
+    FROM \`${CLASSIFICATION}.clustering\` cl
+    INNER JOIN basket_works bw ON cl.work_id = bw.work_id
+    GROUP BY cl.micro_cluster_id
+),
+cluster_totals AS (
+    SELECT cl.micro_cluster_id, COUNT(DISTINCT cl.work_id) AS total_works_in_cluster
+    FROM \`${CLASSIFICATION}.clustering\` cl
+    JOIN \`${ORION_SOURCE}.work\` w ON cl.work_id = w.work_id
+    WHERE w.pub_year BETWEEN ${yf} AND ${yt}
+    GROUP BY cl.micro_cluster_id
+)
+SELECT
+    bc.micro_cluster_id,
+    mc.long_label,
+    bc.basket_works_count,
+    ct.total_works_in_cluster,
+    ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion
+FROM basket_clusters bc
+JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
+LEFT JOIN \`${CLASSIFICATION}.micro_cluster\` mc ON bc.micro_cluster_id = mc.micro_cluster_id
+ORDER BY bc.basket_works_count DESC`;
+}
+
+export function buildFunderTopicsQuery(ids, yf, yt) {
+  return `-- ORION export: micro-cluster topic breakdown for funder basket
+-- Funder IDs: ${ids.join(', ')}
+-- Year range: ${yf}–${yt}
+--
+-- Returns the micro-clusters (topics) from openalex_2023nov_classification
+-- that cover the basket's works, with absolute counts and proportions.
+-- Proportion = basket_works_count / total_works_in_cluster (within ${yf}–${yt}).
+
+WITH basket_works AS (
+    SELECT DISTINCT wg.work_id
+    FROM \`${ORION_SOURCE}.work_grant\` wg
+    JOIN \`${ORION_SOURCE}.work\` w ON wg.work_id = w.work_id
+    WHERE wg.funder_id IN (${ids.join(', ')})
+      AND w.pub_year BETWEEN ${yf} AND ${yt}
+),
+basket_clusters AS (
+    SELECT cl.micro_cluster_id, COUNT(DISTINCT cl.work_id) AS basket_works_count
+    FROM \`${CLASSIFICATION}.clustering\` cl
+    INNER JOIN basket_works bw ON cl.work_id = bw.work_id
+    GROUP BY cl.micro_cluster_id
+),
+cluster_totals AS (
+    SELECT cl.micro_cluster_id, COUNT(DISTINCT cl.work_id) AS total_works_in_cluster
+    FROM \`${CLASSIFICATION}.clustering\` cl
+    JOIN \`${ORION_SOURCE}.work\` w ON cl.work_id = w.work_id
+    WHERE w.pub_year BETWEEN ${yf} AND ${yt}
+    GROUP BY cl.micro_cluster_id
+)
+SELECT
+    bc.micro_cluster_id,
+    mc.long_label,
+    bc.basket_works_count,
+    ct.total_works_in_cluster,
+    ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion
+FROM basket_clusters bc
+JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
+LEFT JOIN \`${CLASSIFICATION}.micro_cluster\` mc ON bc.micro_cluster_id = mc.micro_cluster_id
+ORDER BY bc.basket_works_count DESC`;
+}
+
 // ── Shared components ─────────────────────────────────────────────────────────

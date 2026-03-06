@@ -21,6 +21,8 @@ export {
   buildFunderCoFunderQuery,
   buildInstSearchQuery,
   buildFunderSearchQuery,
+  buildInstTopicsQuery,
+  buildFunderTopicsQuery,
 } from './queryBuilders';
 
 export function QueryModal({ sql, onClose }) {
@@ -144,6 +146,94 @@ export function ResultTable({ rows, type, addToBasket, basket, idKey, loading })
           </>)}
           <button className="btn ghost" onClick={() => setMinimized(true)} title="Minimize table">− Minimize</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * TopicsTable — shows how the basket's works are distributed across
+ * openalex_2023nov_classification micro-clusters (topics).
+ *
+ * Columns: rank, micro_cluster_id, long_label, basket_works_count,
+ *          total_works_in_cluster (within period), proportion (bar + %).
+ */
+export function TopicsTable({ rows, loading }) {
+  const tbl = useTable(rows, rows.length); // show all rows (user's request)
+
+  const STh = (k, label, align) => (
+    <th
+      onClick={() => tbl.onSort(k)}
+      className={tbl.sortKey === k ? 'sorted' : ''}
+      style={align === 'right' ? { textAlign: 'right' } : undefined}
+    >
+      {label}{tbl.sortIcon(k)}
+    </th>
+  );
+
+  if (loading) return <div className="status">Running…</div>;
+  if (!rows.length) return <div className="status">No topic data found for this selection.</div>;
+
+  const maxProp = Math.max(...rows.map(r => r.proportion ?? 0));
+
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            {STh('micro_cluster_id', 'Cluster ID')}
+            {STh('long_label', 'Topic')}
+            {STh('basket_works_count', 'Basket works', 'right')}
+            {STh('total_works_in_cluster', 'Total in cluster', 'right')}
+            {STh('proportion', 'Proportion', 'right')}
+          </tr>
+        </thead>
+        <tbody>
+          {tbl.visibleRows.map((r, i) => {
+            const pct = r.proportion != null ? (r.proportion * 100) : null;
+            const barWidth = maxProp > 0 ? ((r.proportion ?? 0) / maxProp) * 100 : 0;
+            return (
+              <tr key={r.micro_cluster_id ?? i}>
+                <td className="rank">{i + 1}</td>
+                <td style={{ color: '#64748b', fontSize: '.78rem', fontVariantNumeric: 'tabular-nums' }}>
+                  {r.micro_cluster_id ?? '—'}
+                </td>
+                <td style={{ maxWidth: '340px', lineHeight: 1.45 }}>
+                  {r.long_label ?? <span style={{ color: '#475569' }}>—</span>}
+                </td>
+                <td className="works" style={{ textAlign: 'right' }}>
+                  {Number(r.basket_works_count).toLocaleString()}
+                </td>
+                <td className="works" style={{ textAlign: 'right', color: '#64748b' }}>
+                  {Number(r.total_works_in_cluster).toLocaleString()}
+                </td>
+                <td style={{ textAlign: 'right', minWidth: '140px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', justifyContent: 'flex-end' }}>
+                    <div style={{ width: '70px', height: '6px', background: '#1e2235', borderRadius: '3px', flexShrink: 0 }}>
+                      <div style={{
+                        width: `${barWidth}%`,
+                        height: '100%',
+                        background: '#7c8cff',
+                        borderRadius: '3px',
+                        transition: 'width .2s',
+                      }} />
+                    </div>
+                    <span style={{ fontSize: '.8rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums', minWidth: '44px' }}>
+                      {pct != null ? `${(pct).toFixed(1)}%` : '—'}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="tbl-footer">
+        <span>{rows.length.toLocaleString()} micro-clusters</span>
+        <span style={{ fontSize: '.72rem', color: '#334155' }}>
+          Proportion = basket works ÷ total cluster works within selected period
+        </span>
       </div>
     </div>
   );

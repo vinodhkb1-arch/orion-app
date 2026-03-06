@@ -540,6 +540,106 @@ def basket_funder_co_funders(req: FunderBasketRequest, request: Request):
     """, {"ids": ids, "year_from": yf, "year_to": yt, "limit": lim}, pid)
     return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
 
+# ── Topic / micro-cluster breakdown ──────────────────────────────────────────
+# Uses the openalex_2023nov_classification dataset (separate from SOURCE).
+# work_ids are cross-compatible between snapshots.
+#
+# For each basket we:
+#   1. Collect the distinct work_ids for the basket in the given year range.
+#   2. Join with cwts-leiden.openalex_2023nov_classification.clustering to get
+#      the micro_cluster_id for each work (works without a cluster are ignored).
+#   3. Join with the micro_cluster table to get the long_label.
+#   4. Return the absolute count and the proportion relative to the total
+#      cluster size (also filtered to the same year range via the SOURCE work table).
+
+CLASSIFICATION = "cwts-leiden.openalex_2023nov_classification"
+
+@app.post("/api/basket/institutions/topics")
+def basket_inst_topics(req: InstBasketRequest, request: Request):
+    """Micro-cluster topic breakdown for a basket of institutions."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.institution_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    yf, yt, ids = req.year_from, req.year_to, req.institution_ids
+    rows, bp = run_query(f"""
+        WITH basket_works AS (
+            SELECT DISTINCT wai.work_id
+            FROM `{SOURCE}.work_affiliation_institution` wai
+            JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
+            WHERE wai.institution_id IN UNNEST(@ids)
+              AND w.pub_year BETWEEN @year_from AND @year_to
+        ),
+        basket_clusters AS (
+            SELECT cl.micro_cluster_id, COUNT(DISTINCT cl.work_id) AS basket_works_count
+            FROM `{CLASSIFICATION}.clustering` cl
+            INNER JOIN basket_works bw ON cl.work_id = bw.work_id
+            GROUP BY cl.micro_cluster_id
+        ),
+        cluster_totals AS (
+            SELECT cl.micro_cluster_id, COUNT(DISTINCT cl.work_id) AS total_works_in_cluster
+            FROM `{CLASSIFICATION}.clustering` cl
+            JOIN `{SOURCE}.work` w ON cl.work_id = w.work_id
+            WHERE w.pub_year BETWEEN @year_from AND @year_to
+            GROUP BY cl.micro_cluster_id
+        )
+        SELECT
+            bc.micro_cluster_id,
+            mc.long_label,
+            bc.basket_works_count,
+            ct.total_works_in_cluster,
+            ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion
+        FROM basket_clusters bc
+        JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
+        LEFT JOIN `{CLASSIFICATION}.micro_cluster` mc ON bc.micro_cluster_id = mc.micro_cluster_id
+        ORDER BY bc.basket_works_count DESC
+    """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+
+
+@app.post("/api/basket/funders/topics")
+def basket_funder_topics(req: FunderBasketRequest, request: Request):
+    """Micro-cluster topic breakdown for a basket of funders."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.funder_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    yf, yt, ids = req.year_from, req.year_to, req.funder_ids
+    rows, bp = run_query(f"""
+        WITH basket_works AS (
+            SELECT DISTINCT wg.work_id
+            FROM `{SOURCE}.work_grant` wg
+            JOIN `{SOURCE}.work` w ON wg.work_id = w.work_id
+            WHERE wg.funder_id IN UNNEST(@ids)
+              AND w.pub_year BETWEEN @year_from AND @year_to
+        ),
+        basket_clusters AS (
+            SELECT cl.micro_cluster_id, COUNT(DISTINCT cl.work_id) AS basket_works_count
+            FROM `{CLASSIFICATION}.clustering` cl
+            INNER JOIN basket_works bw ON cl.work_id = bw.work_id
+            GROUP BY cl.micro_cluster_id
+        ),
+        cluster_totals AS (
+            SELECT cl.micro_cluster_id, COUNT(DISTINCT cl.work_id) AS total_works_in_cluster
+            FROM `{CLASSIFICATION}.clustering` cl
+            JOIN `{SOURCE}.work` w ON cl.work_id = w.work_id
+            WHERE w.pub_year BETWEEN @year_from AND @year_to
+            GROUP BY cl.micro_cluster_id
+        )
+        SELECT
+            bc.micro_cluster_id,
+            mc.long_label,
+            bc.basket_works_count,
+            ct.total_works_in_cluster,
+            ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion
+        FROM basket_clusters bc
+        JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
+        LEFT JOIN `{CLASSIFICATION}.micro_cluster` mc ON bc.micro_cluster_id = mc.micro_cluster_id
+        ORDER BY bc.basket_works_count DESC
+    """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+
+
 # ── VOSviewer network export ──────────────────────────────────────────────────
 # Networks are expensive to recompute and need to be accessible by VOSviewer
 # Online (an external service) without auth cookies. We generate the network

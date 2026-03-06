@@ -13,7 +13,7 @@
 import React, { useState } from 'react';
 import { apiFetch, openVosViewer } from '../api';
 import { BytesTag } from '../bytesInfo';
-import { QueryModal, ResultTable, PermissionError, CollapsibleSection } from './BasketShared';
+import { QueryModal, ResultTable, PermissionError, CollapsibleSection, TopicsTable } from './BasketShared';
 
 export default function BasketPage({
   basket,
@@ -33,31 +33,34 @@ export default function BasketPage({
   title,
   emptyHint,
 }) {
-  const { yearFrom: savedYF, yearTo: savedYT, worksResult, coInstResult, coFundResult } = basketData;
+  const { yearFrom: savedYF, yearTo: savedYT, worksResult, coInstResult, coFundResult, topicsResult } = basketData;
   const [yearFrom, setYF] = useState(savedYF);
   const [yearTo,   setYT] = useState(savedYT);
 
-  const [worksLoading,  setWorksLoading]  = useState(false);
-  const [coInstLoading, setCoInstLoading] = useState(false);
-  const [coFundLoading, setCoFundLoading] = useState(false);
-  const [vosLoading,    setVosLoading]    = useState(false);
-  const [vosError,      setVosError]      = useState('');
+  const [worksLoading,   setWorksLoading]   = useState(false);
+  const [coInstLoading,  setCoInstLoading]  = useState(false);
+  const [coFundLoading,  setCoFundLoading]  = useState(false);
+  const [topicsLoading,  setTopicsLoading]  = useState(false);
+  const [vosLoading,     setVosLoading]     = useState(false);
+  const [vosError,       setVosError]       = useState('');
 
   // VOSviewer network options
   const [vosLimit,    setVosLimit]    = useState(100);
   const [vosAllWorks, setVosAllWorks] = useState(false);
 
-  const [worksQuery,  setWorksQuery]  = useState(false);
-  const [coInstQuery, setCoInstQuery] = useState(false);
-  const [coFundQuery, setCoFundQuery] = useState(false);
+  const [worksQuery,   setWorksQuery]   = useState(false);
+  const [coInstQuery,  setCoInstQuery]  = useState(false);
+  const [coFundQuery,  setCoFundQuery]  = useState(false);
+  const [topicsQuery,  setTopicsQuery]  = useState(false);
 
   const [error, setError]               = useState('');
   const [permissionError, setPermError] = useState(false);
 
   // Persist results + the year range that was actually used, so labels stay in sync.
-  const setWorksResult  = (r, yf, yt) => setBasketData(d => ({ ...d, worksResult: r,  worksYF: yf,  worksYT: yt  }));
-  const setCoInstResult = (r, yf, yt) => setBasketData(d => ({ ...d, coInstResult: r, coInstYF: yf, coInstYT: yt }));
-  const setCoFundResult = (r, yf, yt) => setBasketData(d => ({ ...d, coFundResult: r, coFundYF: yf, coFundYT: yt }));
+  const setWorksResult   = (r, yf, yt) => setBasketData(d => ({ ...d, worksResult:   r, worksYF:   yf, worksYT:   yt }));
+  const setCoInstResult  = (r, yf, yt) => setBasketData(d => ({ ...d, coInstResult:  r, coInstYF:  yf, coInstYT:  yt }));
+  const setCoFundResult  = (r, yf, yt) => setBasketData(d => ({ ...d, coFundResult:  r, coFundYF:  yf, coFundYT:  yt }));
+  const setTopicsResult  = (r, bp, yf, yt) => setBasketData(d => ({ ...d, topicsResult: r, topicsBP: bp, topicsYF: yf, topicsYT: yt }));
 
   // Also persist the year inputs so they survive tab switches.
   const applyYF = v => { setYF(v); setBasketData(d => ({ ...d, yearFrom: v })); };
@@ -111,6 +114,15 @@ export default function BasketPage({
       .then(d => { if (d) setCoFundResult(d, yf, yt); })
       .catch(handleError)
       .finally(() => setCoFundLoading(false));
+  };
+
+  const getTopics = () => {
+    const yf = yearFrom, yt = yearTo;
+    setTopicsLoading(true); setError(''); setPermError(false);
+    apiFetch(`${apiBase}/topics`, postOpts(yf, yt))
+      .then(d => { if (d) setTopicsResult(d.rows, d.bytes_processed, yf, yt); })
+      .catch(handleError)
+      .finally(() => setTopicsLoading(false));
   };
 
   const openVos = () => {
@@ -191,9 +203,10 @@ export default function BasketPage({
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-            {actionBtn('Get all works',                getWorks,  worksLoading)}
-            {actionBtn('Get co-occurring institutions', getCoInst, coInstLoading)}
-            {actionBtn('Get co-occurring funders',      getCoFund, coFundLoading)}
+            {actionBtn('Get all works',                getWorks,   worksLoading)}
+            {actionBtn('Get co-occurring institutions', getCoInst,  coInstLoading)}
+            {actionBtn('Get co-occurring funders',      getCoFund,  coFundLoading)}
+            {actionBtn('Get topic breakdown',           getTopics,  topicsLoading)}
           </div>
 
           {permissionError && <PermissionError projectId={projectId} />}
@@ -351,9 +364,30 @@ export default function BasketPage({
             </CollapsibleSection>
           )}
 
+          {/* Topics result */}
+          {(topicsResult || topicsLoading) && (() => {
+            const tYF = basketData.topicsYF ?? yearFrom;
+            const tYT = basketData.topicsYT ?? yearTo;
+            return (
+              <CollapsibleSection
+                title="Topic breakdown"
+                badge={topicsResult && <BytesTag bytes={basketData.topicsBP} />}
+                actions={topicsResult?.length > 0 && <button className="btn ghost" onClick={() => setTopicsQuery(true)}>Get export query</button>}
+              >
+                <p style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.6, marginBottom: '.75rem' }}>
+                  Distribution of the basket's works across micro-clusters from the{' '}
+                  <strong style={{ color: '#64748b' }}>CWTS openalex_2023nov_classification</strong>.
+                  {' '}Proportion = basket works ÷ total cluster works within {tYF}–{tYT}.
+                </p>
+                <TopicsTable rows={topicsResult || []} loading={topicsLoading} />
+              </CollapsibleSection>
+            );
+          })()}
+
           {worksQuery  && <QueryModal sql={queryBuilders.works(ids, wYF, wYT)}    onClose={() => setWorksQuery(false)} />}
           {coInstQuery && <QueryModal sql={queryBuilders.coInst(ids, basketData.coInstYF ?? yearFrom, basketData.coInstYT ?? yearTo)} onClose={() => setCoInstQuery(false)} />}
           {coFundQuery && <QueryModal sql={queryBuilders.coFund(ids, basketData.coFundYF ?? yearFrom, basketData.coFundYT ?? yearTo)} onClose={() => setCoFundQuery(false)} />}
+          {topicsQuery && <QueryModal sql={queryBuilders.topics(ids, basketData.topicsYF ?? yearFrom, basketData.topicsYT ?? yearTo)} onClose={() => setTopicsQuery(false)} />}
         </>
       }
     </div>
