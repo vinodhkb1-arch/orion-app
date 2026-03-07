@@ -1,7 +1,6 @@
 import React from 'react';
 import EntityList from './EntityList';
 import { buildInstSearchQuery } from './BasketShared';
-import { ORION_SOURCE } from '../api';
 
 const FIELDS = [
   { value: 'name',    label: 'Name' },

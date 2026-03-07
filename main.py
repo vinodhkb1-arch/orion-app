@@ -556,7 +556,9 @@ CLASSIFICATION = "cwts-leiden.openalex_2023nov_classification"
 
 @app.post("/api/basket/institutions/topics")
 def basket_inst_topics(req: InstBasketRequest, request: Request):
-    """Micro-cluster topic breakdown for a basket of institutions."""
+    """Micro-cluster topic breakdown for a basket of institutions.
+    Returns ALL micro-clusters (within the year range), with basket_works_count=0
+    for clusters where the basket has no publications."""
     session = require_auth(request)
     pid = session["project_id"]
     if not req.institution_ids:
@@ -592,16 +594,16 @@ def basket_inst_topics(req: InstBasketRequest, request: Request):
             SELECT COUNT(*) AS n FROM basket_works
         )
         SELECT
-            bc.micro_cluster_id,
+            ct.micro_cluster_id,
             mc.long_label,
-            bc.basket_works_count,
+            COALESCE(bc.basket_works_count, 0) AS basket_works_count,
             ct.total_works_in_cluster,
-            ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion,
+            ROUND(SAFE_DIVIDE(COALESCE(bc.basket_works_count, 0), ct.total_works_in_cluster), 4) AS proportion,
             (SELECT n FROM total_count) - (SELECT n FROM classified_count) AS unclassified_works
-        FROM basket_clusters bc
-        JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
-        LEFT JOIN `{CLASSIFICATION}.micro_cluster` mc ON bc.micro_cluster_id = mc.micro_cluster_id
-        ORDER BY bc.basket_works_count DESC
+        FROM cluster_totals ct
+        LEFT JOIN basket_clusters bc ON ct.micro_cluster_id = bc.micro_cluster_id
+        LEFT JOIN `{CLASSIFICATION}.micro_cluster` mc ON ct.micro_cluster_id = mc.micro_cluster_id
+        ORDER BY basket_works_count DESC, ct.total_works_in_cluster DESC
     """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
     unclassified = rows[0]["unclassified_works"] if rows else 0
     clean_rows = [{k: v for k, v in r.items() if k != "unclassified_works"} for r in rows]
@@ -610,7 +612,9 @@ def basket_inst_topics(req: InstBasketRequest, request: Request):
 
 @app.post("/api/basket/funders/topics")
 def basket_funder_topics(req: FunderBasketRequest, request: Request):
-    """Micro-cluster topic breakdown for a basket of funders."""
+    """Micro-cluster topic breakdown for a basket of funders.
+    Returns ALL micro-clusters (within the year range), with basket_works_count=0
+    for clusters where the basket has no publications."""
     session = require_auth(request)
     pid = session["project_id"]
     if not req.funder_ids:
@@ -646,16 +650,16 @@ def basket_funder_topics(req: FunderBasketRequest, request: Request):
             SELECT COUNT(*) AS n FROM basket_works
         )
         SELECT
-            bc.micro_cluster_id,
+            ct.micro_cluster_id,
             mc.long_label,
-            bc.basket_works_count,
+            COALESCE(bc.basket_works_count, 0) AS basket_works_count,
             ct.total_works_in_cluster,
-            ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion,
+            ROUND(SAFE_DIVIDE(COALESCE(bc.basket_works_count, 0), ct.total_works_in_cluster), 4) AS proportion,
             (SELECT n FROM total_count) - (SELECT n FROM classified_count) AS unclassified_works
-        FROM basket_clusters bc
-        JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
-        LEFT JOIN `{CLASSIFICATION}.micro_cluster` mc ON bc.micro_cluster_id = mc.micro_cluster_id
-        ORDER BY bc.basket_works_count DESC
+        FROM cluster_totals ct
+        LEFT JOIN basket_clusters bc ON ct.micro_cluster_id = bc.micro_cluster_id
+        LEFT JOIN `{CLASSIFICATION}.micro_cluster` mc ON ct.micro_cluster_id = mc.micro_cluster_id
+        ORDER BY basket_works_count DESC, ct.total_works_in_cluster DESC
     """, {"ids": ids, "year_from": yf, "year_to": yt}, pid)
     unclassified = rows[0]["unclassified_works"] if rows else 0
     clean_rows = [{k: v for k, v in r.items() if k != "unclassified_works"} for r in rows]

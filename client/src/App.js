@@ -23,19 +23,19 @@ export default function App() {
 
   const removeInst = id => {
     inst.removeFromBasket(id);
-    setInstBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
+    setInstBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null, topicsResult: null }));
   };
   const removeFunder = id => {
     funder.removeFromBasket(id);
-    setFunderBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
+    setFunderBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null, topicsResult: null }));
   };
   const clearInst = () => {
     inst.clearBasket();
-    setInstBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
+    setInstBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null, topicsResult: null }));
   };
   const clearFunder = () => {
     funder.clearBasket();
-    setFunderBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null }));
+    setFunderBasketData(d => ({ ...d, worksResult: null, coInstResult: null, coFundResult: null, topicsResult: null }));
   };
 
   useEffect(() => {

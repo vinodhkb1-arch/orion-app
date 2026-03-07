@@ -232,8 +232,8 @@ export function buildInstTopicsQuery(ids, yf, yt) {
 -- Institution IDs: ${ids.join(', ')}
 -- Year range: ${yf}–${yt}
 --
--- Returns the micro-clusters (topics) from openalex_2023nov_classification
--- that cover the basket's works, with absolute counts and proportions.
+-- Returns ALL micro-clusters from openalex_2023nov_classification (within the
+-- year range), including those with no basket publications (basket_works_count=0).
 -- Proportion = basket_works_count / total_works_in_cluster (within ${yf}–${yt}).
 
 WITH basket_works AS (
@@ -257,15 +257,15 @@ cluster_totals AS (
     GROUP BY cl.micro_cluster_id
 )
 SELECT
-    bc.micro_cluster_id,
+    ct.micro_cluster_id,
     mc.long_label,
-    bc.basket_works_count,
+    COALESCE(bc.basket_works_count, 0) AS basket_works_count,
     ct.total_works_in_cluster,
-    ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion
-FROM basket_clusters bc
-JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
-LEFT JOIN \`${CLASSIFICATION}.micro_cluster\` mc ON bc.micro_cluster_id = mc.micro_cluster_id
-ORDER BY bc.basket_works_count DESC`;
+    ROUND(SAFE_DIVIDE(COALESCE(bc.basket_works_count, 0), ct.total_works_in_cluster), 4) AS proportion
+FROM cluster_totals ct
+LEFT JOIN basket_clusters bc ON ct.micro_cluster_id = bc.micro_cluster_id
+LEFT JOIN \`${CLASSIFICATION}.micro_cluster\` mc ON ct.micro_cluster_id = mc.micro_cluster_id
+ORDER BY basket_works_count DESC, ct.total_works_in_cluster DESC`;
 }
 
 export function buildFunderTopicsQuery(ids, yf, yt) {
@@ -273,8 +273,8 @@ export function buildFunderTopicsQuery(ids, yf, yt) {
 -- Funder IDs: ${ids.join(', ')}
 -- Year range: ${yf}–${yt}
 --
--- Returns the micro-clusters (topics) from openalex_2023nov_classification
--- that cover the basket's works, with absolute counts and proportions.
+-- Returns ALL micro-clusters from openalex_2023nov_classification (within the
+-- year range), including those with no basket publications (basket_works_count=0).
 -- Proportion = basket_works_count / total_works_in_cluster (within ${yf}–${yt}).
 
 WITH basket_works AS (
@@ -298,15 +298,13 @@ cluster_totals AS (
     GROUP BY cl.micro_cluster_id
 )
 SELECT
-    bc.micro_cluster_id,
+    ct.micro_cluster_id,
     mc.long_label,
-    bc.basket_works_count,
+    COALESCE(bc.basket_works_count, 0) AS basket_works_count,
     ct.total_works_in_cluster,
-    ROUND(SAFE_DIVIDE(bc.basket_works_count, ct.total_works_in_cluster), 4) AS proportion
-FROM basket_clusters bc
-JOIN cluster_totals ct ON bc.micro_cluster_id = ct.micro_cluster_id
-LEFT JOIN \`${CLASSIFICATION}.micro_cluster\` mc ON bc.micro_cluster_id = mc.micro_cluster_id
-ORDER BY bc.basket_works_count DESC`;
+    ROUND(SAFE_DIVIDE(COALESCE(bc.basket_works_count, 0), ct.total_works_in_cluster), 4) AS proportion
+FROM cluster_totals ct
+LEFT JOIN basket_clusters bc ON ct.micro_cluster_id = bc.micro_cluster_id
+LEFT JOIN \`${CLASSIFICATION}.micro_cluster\` mc ON ct.micro_cluster_id = mc.micro_cluster_id
+ORDER BY basket_works_count DESC, ct.total_works_in_cluster DESC`;
 }
-
-// ── Shared components ─────────────────────────────────────────────────────────
