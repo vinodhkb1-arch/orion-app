@@ -102,6 +102,17 @@ export default function LoginGate() {
         {showSetup && (
           <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '12px', overflow: 'hidden' }}>
 
+            {/* Video link */}
+            <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #2d3148', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <span style={{ fontSize: '.9rem' }}>🎬</span>
+              <span style={{ fontSize: '.78rem', color: '#64748b' }}>
+                Prefer to follow along?{' '}
+                <a href="https://drive.google.com/file/d/13ERJc_MG_VO5s4oiEMW5PxJPfSCNz9sS/view?usp=drive_link" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>
+                  Watch the setup video ↗
+                </a>
+              </span>
+            </div>
+
             {/* Part A: Create or find your project */}
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #2d3148' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.75rem' }}>
