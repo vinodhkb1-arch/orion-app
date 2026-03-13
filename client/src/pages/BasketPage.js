@@ -45,8 +45,9 @@ export default function BasketPage({
   const [vosError,       setVosError]       = useState('');
 
   // VOSviewer network options
-  const [vosLimit,    setVosLimit]    = useState(100);
-  const [vosAllWorks, setVosAllWorks] = useState(false);
+  const [vosLimit,      setVosLimit]      = useState(100);
+  const [vosLimitInput, setVosLimitInput] = useState('100'); // raw string for the input field
+  const [vosAllWorks,   setVosAllWorks]   = useState(false);
 
   const [worksQuery,   setWorksQuery]   = useState(false);
   const [coInstQuery,  setCoInstQuery]  = useState(false);
@@ -228,8 +229,8 @@ export default function BasketPage({
 
             {/* Network explanation */}
             <p style={{ fontSize: '.78rem', color: '#475569', lineHeight: 1.65, marginBottom: '1rem' }}>
-              The network shows your <strong style={{ color: '#64748b' }}>basket {type}</strong> (cluster 1)
-              and their top co-occurring {type} (cluster 2).
+              The map shows the top <strong style={{ color: '#64748b' }}>N {type}</strong> ranked by works count — this total includes your basket items.
+              Basket items are highlighted as <strong style={{ color: '#64748b' }}>cluster 1</strong>; all others are cluster 2.
               Node size = works. Edge thickness = shared works between each pair.
             </p>
 
@@ -239,21 +240,27 @@ export default function BasketPage({
               {/* Option 1: node count */}
               <div>
                 <label style={{ display: 'block', fontSize: '.75rem', color: '#64748b', marginBottom: '.35rem' }}>
-                  {type === 'institutions' ? 'Institutions' : 'Funders'} in the map
+                  Total {type === 'institutions' ? 'institutions' : 'funders'} in the map
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
                   <span style={{ fontSize: '.78rem', color: '#475569' }}>Top</span>
                   <input
                     type="number"
-                    value={vosLimit}
+                    value={vosLimitInput}
                     min={10} max={500}
-                    onChange={e => setVosLimit(Math.max(10, Math.min(500, Number(e.target.value))))}
+                    onChange={e => setVosLimitInput(e.target.value)}
+                    onBlur={e => {
+                      const parsed = parseInt(e.target.value, 10);
+                      const clamped = isNaN(parsed) ? 100 : Math.max(10, Math.min(500, parsed));
+                      setVosLimit(clamped);
+                      setVosLimitInput(String(clamped));
+                    }}
                     style={{ width: '64px', background: '#0f1117', border: '1px solid #2d3148', borderRadius: '6px', color: '#e2e8f0', padding: '.4rem .6rem', fontSize: '.85rem', outline: 'none' }}
                   />
-                  <span style={{ fontSize: '.78rem', color: '#475569' }}>co-occurring {type}</span>
+                  <span style={{ fontSize: '.78rem', color: '#475569' }}>{type} total</span>
                 </div>
                 <div style={{ fontSize: '.7rem', color: '#334155', marginTop: '.3rem' }}>
-                  Ranked by works count within the basket's work set.
+                  Basket items + co-occurring {type}, ranked by works count. Basket items may push others out.
                 </div>
               </div>
 

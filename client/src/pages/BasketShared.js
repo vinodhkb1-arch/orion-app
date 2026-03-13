@@ -101,6 +101,16 @@ export function ResultTable({ rows, type, addToBasket, basket, idKey, loading })
 
   return (
     <div className="table-wrap">
+      <div className="tbl-footer" style={{ marginBottom: '.5rem' }}>
+        <span>Showing {tbl.visibleRows.length} of {rows.length} results</span>
+        <div className="tbl-expand">
+          {hasMore && (<>
+            <button className="btn ghost" onClick={() => setDisplayLimit(l => l + STEP)}>+ {STEP} more</button>
+            <button className="btn ghost" onClick={() => setDisplayLimit(rows.length)}>Show all {rows.length.toLocaleString()}</button>
+          </>)}
+          <button className="btn ghost" onClick={() => setMinimized(true)} title="Minimize table">− Minimize</button>
+        </div>
+      </div>
       <table>
         <thead><tr>
           <th>#</th>
@@ -159,6 +169,7 @@ export function ResultTable({ rows, type, addToBasket, basket, idKey, loading })
  *          total_works_in_cluster (within period), proportion (bar + %).
  */
 export function TopicsTable({ rows, loading, unclassified = 0 }) {
+  const [minimized, setMinimized] = useState(false);
   const tbl = useTable(rows, rows.length); // show all rows (user's request)
 
   const STh = (k, label, align) => (
@@ -173,6 +184,12 @@ export function TopicsTable({ rows, loading, unclassified = 0 }) {
 
   if (loading) return <div className="status">Running…</div>;
   if (!rows.length) return <div className="status">No topic data found for this selection.</div>;
+  if (minimized) return (
+    <div className="tbl-minimized">
+      <span>{rows.length.toLocaleString()} micro-clusters hidden</span>
+      <button className="btn ghost" onClick={() => setMinimized(false)}>Show table</button>
+    </div>
+  );
 
   return (
     <div>
@@ -183,6 +200,12 @@ export function TopicsTable({ rows, loading, unclassified = 0 }) {
         </div>
       )}
       <div className="table-wrap">
+        <div className="tbl-footer" style={{ marginBottom: '.5rem' }}>
+          <span>{rows.length.toLocaleString()} micro-clusters</span>
+          <div className="tbl-expand">
+            <button className="btn ghost" onClick={() => setMinimized(true)} title="Minimize table">− Minimize</button>
+          </div>
+        </div>
         <table>
           <thead>
             <tr>
@@ -237,9 +260,12 @@ export function TopicsTable({ rows, loading, unclassified = 0 }) {
         </table>
         <div className="tbl-footer">
           <span>{rows.length.toLocaleString()} micro-clusters</span>
-          <span style={{ fontSize: '.72rem', color: '#334155' }}>
-            Proportion = basket works ÷ total cluster works within selected period
-          </span>
+          <div className="tbl-expand">
+            <span style={{ fontSize: '.72rem', color: '#334155' }}>
+              Proportion = basket works ÷ total cluster works within selected period
+            </span>
+            <button className="btn ghost" onClick={() => setMinimized(true)} title="Minimize table">− Minimize</button>
+          </div>
         </div>
       </div>
     </div>
