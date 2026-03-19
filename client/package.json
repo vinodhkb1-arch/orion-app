@@ -8,15 +8,33 @@
     "react-scripts": "5.0.1",
     "recharts": "^2.10.3"
   },
-  "scripts": { "build": "react-scripts build" },
+  "scripts": {
+    "build": "react-scripts build",
+    "start": "react-scripts start"
+  },
   "eslintConfig": {
-    "extends": ["react-app"],
-    "plugins": ["react-hooks"],
+    "extends": [
+      "react-app"
+    ],
+    "plugins": [
+      "react-hooks"
+    ],
     "rules": {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn"
     }
   },
   "proxy": "http://localhost:8080",
-  "browserslist": { "production": [">0.2%"] }
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
 }
