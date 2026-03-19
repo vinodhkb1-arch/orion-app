@@ -79,16 +79,6 @@ export default function LoginGate() {
           <div style={S.stepRow}>
             <div style={S.stepNum}>1</div>
             <div style={S.stepBody}>
-              <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer" style={S.link}>
-                Create a Google Cloud project ↗
-              </a>
-            </div>
-          </div>
-
-          {/* Step 1 */}
-          <div style={S.stepRow}>
-            <div style={S.stepNum}>1</div>
-            <div style={S.stepBody}>
               <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer" style={S.link}>Create a Google Cloud project ↗</a>
               <span style={{ color: '#94a3b8' }}> — you can choose any name.</span>
             </div>

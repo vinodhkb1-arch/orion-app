@@ -23,6 +23,8 @@ export default function BasketPage({
   setBasketData,
   addInstToBasket,
   addFunderToBasket,
+  instBasket,
+  funderBasket,
   setPage,
   projectId,
   // config
@@ -346,7 +348,7 @@ export default function BasketPage({
                 rows={coInstResult?.rows || []}
                 type="institutions"
                 addToBasket={addInstToBasket}
-                basket={basket}
+                basket={instBasket}
                 idKey="institution_id"
                 loading={coInstLoading}
               />
@@ -364,7 +366,7 @@ export default function BasketPage({
                 rows={coFundResult?.rows || []}
                 type="funders"
                 addToBasket={addFunderToBasket}
-                basket={basket}
+                basket={funderBasket}
                 idKey="funder_id"
                 loading={coFundLoading}
               />

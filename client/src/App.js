@@ -112,8 +112,8 @@ export default function App() {
       {page === 'overview'      && <Overview setPage={setPage} />}
       {page === 'institutions'  && <Institutions instData={instData} setInstData={setInstData} basket={inst.basket} addToBasket={inst.addToBasket} addManyToBasket={inst.addManyToBasket} projectId={authState.project_id} />}
       {page === 'funders'       && <Funders funderData={funderData} setFunderData={setFunderData} basket={funder.basket} addToBasket={funder.addToBasket} addManyToBasket={funder.addManyToBasket} projectId={authState.project_id} />}
-      {page === 'inst-basket'   && <InstBasket basket={inst.basket} removeFromBasket={removeInst} clearBasket={clearInst} basketData={instBasketData} setBasketData={setInstBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} setPage={setPage} projectId={authState.project_id} />}
-      {page === 'funder-basket' && <FunderBasket basket={funder.basket} removeFromBasket={removeFunder} clearBasket={clearFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} setPage={setPage} projectId={authState.project_id} />}
+      {page === 'inst-basket'   && <InstBasket basket={inst.basket} removeFromBasket={removeInst} clearBasket={clearInst} basketData={instBasketData} setBasketData={setInstBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} instBasket={inst.basket} funderBasket={funder.basket} setPage={setPage} projectId={authState.project_id} />}
+      {page === 'funder-basket' && <FunderBasket basket={funder.basket} removeFromBasket={removeFunder} clearBasket={clearFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} instBasket={inst.basket} funderBasket={funder.basket} setPage={setPage} projectId={authState.project_id} />}
       {page === 'guide'         && <Guide />}
     </>
   );
