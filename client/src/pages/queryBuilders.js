@@ -9,13 +9,7 @@
  */
 import { ORION_SOURCE } from '../api';
 export function buildInstWorksQuery(ids, yf, yt) {
-  return `-- ORION export: all works for institution basket
--- Institution IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns the unique work_id of every paper affiliated with
--- the selected institutions in the given year range.
--- See the Guide tab for instructions and join examples.
+  return `-- ORION: all works · ${ids.length} institution${ids.length !== 1 ? 's' : ''} · ${yf}–${yt}
 
 SELECT DISTINCT wai.work_id
 FROM \`${ORION_SOURCE}.work_affiliation_institution\` wai
@@ -26,12 +20,7 @@ ORDER BY wai.work_id`;
 }
 
 export function buildInstCoInstQuery(ids, yf, yt) {
-  return `-- ORION export: co-occurring institutions for institution basket
--- Institution IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns institutions that share at least one paper with
--- the basket institutions, ranked by co-occurrence count.
+  return `-- ORION: co-occurring institutions · ${ids.length} institution${ids.length !== 1 ? 's' : ''} · ${yf}–${yt}
 
 SELECT i.institution_id, i.institution AS name,
        i.country_iso_alpha2_code AS country,
@@ -51,12 +40,7 @@ ORDER BY works_count DESC`;
 }
 
 export function buildInstCoFunderQuery(ids, yf, yt) {
-  return `-- ORION export: co-occurring funders for institution basket
--- Institution IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns funders whose grants appear on papers affiliated with
--- the basket institutions, ranked by co-occurrence count.
+  return `-- ORION: co-occurring funders · ${ids.length} institution${ids.length !== 1 ? 's' : ''} · ${yf}–${yt}
 
 SELECT f.funder_id, f.funder AS name,
        f.country_iso_alpha2_code AS country,
@@ -72,13 +56,7 @@ ORDER BY works_count DESC`;
 }
 
 export function buildFunderWorksQuery(ids, yf, yt) {
-  return `-- ORION export: all works for funder basket
--- Funder IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns the unique work_id of every paper that acknowledges
--- funding from the selected funders in the given year range.
--- See the Guide tab for instructions and join examples.
+  return `-- ORION: all works · ${ids.length} funder${ids.length !== 1 ? 's' : ''} · ${yf}–${yt}
 
 SELECT DISTINCT wg.work_id
 FROM \`${ORION_SOURCE}.work_grant\` wg
@@ -89,12 +67,7 @@ ORDER BY wg.work_id`;
 }
 
 export function buildFunderCoInstQuery(ids, yf, yt) {
-  return `-- ORION export: co-occurring institutions for funder basket
--- Funder IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns institutions affiliated with papers funded by
--- the basket funders, ranked by co-occurrence count.
+  return `-- ORION: co-occurring institutions · ${ids.length} funder${ids.length !== 1 ? 's' : ''} · ${yf}–${yt}
 
 SELECT i.institution_id, i.institution AS name,
        i.country_iso_alpha2_code AS country,
@@ -112,12 +85,7 @@ ORDER BY works_count DESC`;
 }
 
 export function buildFunderCoFunderQuery(ids, yf, yt) {
-  return `-- ORION export: co-occurring funders for funder basket
--- Funder IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns other funders that co-funded the same papers as
--- the basket funders, ranked by co-occurrence count.
+  return `-- ORION: co-occurring funders · ${ids.length} funder${ids.length !== 1 ? 's' : ''} · ${yf}–${yt}
 
 SELECT f.funder_id, f.funder AS name,
        f.country_iso_alpha2_code AS country,
@@ -157,16 +125,8 @@ export function buildInstSearchQuery(q, field, yf, yt) {
   const where = q.trim()
     ? `WHERE LOWER(${col}) LIKE '%${q.toLowerCase().replace(/'/g, "\\'")}%'`
     : '-- No filter applied (top institutions by works count)';
-  const desc  = q.trim()
-    ? `-- Search: ${field} LIKE '%${q}%'`
-    : '-- Browse: top institutions by works count';
-  return `-- ORION export: institution search results
-${desc}
--- Year range: ${yf}–${yt}
---
--- Returns the institutions shown in the Institutions tab for the
--- current search, ordered by works count in the given year range.
--- (No row limit — fetch all matching results.)
+  const desc  = q.trim() ? `${field} LIKE '%${q}%'` : 'top by works count';
+  return `-- ORION: institutions · ${desc} · ${yf}–${yt}
 
 SELECT
     i.institution_id,
@@ -195,16 +155,8 @@ export function buildFunderSearchQuery(q, field, yf, yt) {
   const where = q.trim()
     ? `WHERE LOWER(${col}) LIKE '%${q.toLowerCase().replace(/'/g, "\\'")}%'`
     : '-- No filter applied (top funders by works count)';
-  const desc  = q.trim()
-    ? `-- Search: ${field} LIKE '%${q}%'`
-    : '-- Browse: top funders by works count';
-  return `-- ORION export: funder search results
-${desc}
--- Year range: ${yf}–${yt}
---
--- Returns the funders shown in the Funders tab for the
--- current search, ordered by works count in the given year range.
--- (No row limit — fetch all matching results.)
+  const desc  = q.trim() ? `${field} LIKE '%${q}%'` : 'top by works count';
+  return `-- ORION: funders · ${desc} · ${yf}–${yt}
 
 SELECT
     f.funder_id,
@@ -228,13 +180,7 @@ ORDER BY works_count DESC`;
 const CLASSIFICATION = 'cwts-leiden.openalex_2023nov_classification';
 
 export function buildInstTopicsQuery(ids, yf, yt) {
-  return `-- ORION export: micro-cluster topic breakdown for institution basket
--- Institution IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns ALL micro-clusters from openalex_2023nov_classification (within the
--- year range), including those with no basket publications (basket_works_count=0).
--- Proportion = basket_works_count / total_works_in_cluster (within ${yf}–${yt}).
+  return `-- ORION: topic breakdown · ${ids.length} institution${ids.length !== 1 ? 's' : ''} · ${yf}–${yt}
 
 WITH basket_works AS (
     SELECT DISTINCT wai.work_id
@@ -269,13 +215,7 @@ ORDER BY basket_works_count DESC, ct.total_works_in_cluster DESC`;
 }
 
 export function buildFunderTopicsQuery(ids, yf, yt) {
-  return `-- ORION export: micro-cluster topic breakdown for funder basket
--- Funder IDs: ${ids.join(', ')}
--- Year range: ${yf}–${yt}
---
--- Returns ALL micro-clusters from openalex_2023nov_classification (within the
--- year range), including those with no basket publications (basket_works_count=0).
--- Proportion = basket_works_count / total_works_in_cluster (within ${yf}–${yt}).
+  return `-- ORION: topic breakdown · ${ids.length} funder${ids.length !== 1 ? 's' : ''} · ${yf}–${yt}
 
 WITH basket_works AS (
     SELECT DISTINCT wg.work_id
