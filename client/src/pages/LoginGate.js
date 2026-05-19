@@ -134,6 +134,15 @@ export default function LoginGate() {
             </div>
           </div>
 
+          {/* Step 2.3 */}
+          <div style={{ ...S.stepRow, marginTop: '.85rem', marginBottom: 0, paddingLeft: '1.75rem' }}>
+            <div style={{ ...S.stepNum, background: 'transparent', border: '1px solid #2d3148', color: '#475569', fontSize: '.65rem' }}>2.3</div>
+            <div style={S.stepBody} title="BigQuery gives you 1 TB of free query processing per month. If you run out, queries will simply fail until the next month resets. You can also enable billing if you prefer uninterrupted access and are comfortable paying for extra usage.">
+              <a href="https://console.cloud.google.com/billing/linkedaccount" target="_blank" rel="noreferrer" style={S.link}>Make sure you are not billed ↗</a>
+              <span style={{ color: '#94a3b8' }}> — open the link and confirm no billing account is linked to this project.</span>
+            </div>
+          </div>
+
           <hr style={S.divider} />
 
           {/* Sign in */}

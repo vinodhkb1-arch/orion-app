@@ -1,47 +1,34 @@
 import React, { useState } from 'react';
 import { apiFetch, exportCsv } from '../api';
 import { QueryModal } from './BasketShared';
-import {
-  buildDirectCitationQuery,
-  buildCoCitationQuery,
-  buildDirectReferenceQuery,
-  buildBibliographicCouplingQuery,
-} from './queryBuilders';
+import { buildCitationNetworkQuery } from './queryBuilders';
 
 const DISPLAY_LIMIT = 1000;
 
 const TABLE_CONFIGS = [
   {
-    key: 'directCitation',
+    key: 'direct_citation',
     label: 'Direct Citation',
     desc: 'Papers that cite your seeds',
     scoreLabel: 'Seeds cited',
-    endpoint: '/api/lab/direct-citations',
-    buildQuery: buildDirectCitationQuery,
   },
   {
-    key: 'coCitation',
+    key: 'co_citation',
     label: 'Co-citation',
     desc: 'Papers cited alongside your seeds (Janssens & Gwinn 2015)',
     scoreLabel: 'Co-citation freq',
-    endpoint: '/api/lab/co-citations',
-    buildQuery: buildCoCitationQuery,
   },
   {
-    key: 'directReference',
+    key: 'direct_reference',
     label: 'Direct Reference',
     desc: "Papers in your seeds' bibliography",
     scoreLabel: 'Referenced by seeds',
-    endpoint: '/api/lab/direct-references',
-    buildQuery: buildDirectReferenceQuery,
   },
   {
-    key: 'bibCoupling',
+    key: 'bib_coupling',
     label: 'Bibliographic Coupling',
     desc: 'Papers sharing references with your seeds',
     scoreLabel: 'Shared refs',
-    endpoint: '/api/lab/bibliographic-coupling',
-    buildQuery: buildBibliographicCouplingQuery,
   },
 ];
 
@@ -53,35 +40,17 @@ function parseIds(input) {
   )];
 }
 
-function CitationTable({ config, state, workIds, onRun }) {
-  const [queryModalSql, setQueryModalSql] = useState(null);
-  const { rows, loading, error } = state;
+function CitationTable({ config, rows }) {
   const displayRows = rows ? rows.slice(0, DISPLAY_LIMIT) : null;
 
   return (
     <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.75rem' }}>
-        <div>
-          <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: '.9rem' }}>{config.label}</div>
-          <div style={{ fontSize: '.73rem', color: '#475569', marginTop: '.2rem' }}>{config.desc}</div>
-        </div>
-        <button
-          className="btn"
-          style={{ fontSize: '.8rem', flexShrink: 0 }}
-          onClick={onRun}
-          disabled={loading || workIds.length === 0}
-        >
-          {loading ? 'Running…' : 'Run'}
-        </button>
+      <div>
+        <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: '.9rem' }}>{config.label}</div>
+        <div style={{ fontSize: '.73rem', color: '#475569', marginTop: '.2rem' }}>{config.desc}</div>
       </div>
 
-      {error && (
-        <div style={{ background: '#2d1515', border: '1px solid #7f1d1d', borderRadius: '6px', padding: '.65rem .85rem', fontSize: '.78rem', color: '#f87171', lineHeight: 1.5 }}>
-          {error}
-        </div>
-      )}
-
-      {!displayRows && !loading && !error && (
+      {!displayRows && (
         <div style={{ color: '#2d3148', fontSize: '.8rem', textAlign: 'center', padding: '1.5rem 0' }}>
           —
         </div>
@@ -89,15 +58,10 @@ function CitationTable({ config, state, workIds, onRun }) {
 
       {displayRows && (
         <>
-          <div style={{ fontSize: '.72rem', color: '#475569', display: 'flex', gap: '1rem' }}>
-            <span>
-              {rows.length >= DISPLAY_LIMIT
-                ? `Top ${DISPLAY_LIMIT.toLocaleString()} results`
-                : `${rows.length.toLocaleString()} result${rows.length !== 1 ? 's' : ''}`}
-            </span>
-            {state.bytesProcessed != null && (
-              <span>{(state.bytesProcessed / 1e9).toFixed(2)} GB billed</span>
-            )}
+          <div style={{ fontSize: '.72rem', color: '#475569' }}>
+            {rows.length >= DISPLAY_LIMIT
+              ? `Top ${DISPLAY_LIMIT.toLocaleString()} results`
+              : `${rows.length.toLocaleString()} result${rows.length !== 1 ? 's' : ''}`}
           </div>
           <div className="table-wrap" style={{ maxHeight: '380px', overflowY: 'auto' }}>
             <table>
@@ -135,44 +99,48 @@ function CitationTable({ config, state, workIds, onRun }) {
               </tbody>
             </table>
           </div>
-          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-            <button className="btn ghost" style={{ fontSize: '.72rem' }} onClick={() => exportCsv(rows, `${config.key}.csv`)}>
-              Download CSV
-            </button>
-            <button className="btn ghost" style={{ fontSize: '.72rem' }} onClick={() => setQueryModalSql(config.buildQuery(workIds))}>
-              Export query
-            </button>
-          </div>
+          <button className="btn ghost" style={{ fontSize: '.72rem', alignSelf: 'flex-start' }} onClick={() => exportCsv(rows, `${config.key}.csv`)}>
+            Download CSV
+          </button>
         </>
       )}
-
-      {queryModalSql && <QueryModal sql={queryModalSql} onClose={() => setQueryModalSql(null)} />}
     </div>
   );
 }
 
-const emptyState = () => ({ rows: null, loading: false, error: null, bytesProcessed: null });
-
 export default function Lab({ projectId }) {
-  const [rawInput, setRawInput] = useState('');
-  const [tableStates, setTableStates] = useState(
-    Object.fromEntries(TABLE_CONFIGS.map(t => [t.key, emptyState()]))
-  );
+  const [rawInput, setRawInput]       = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState(null);
+  const [tableRows, setTableRows]     = useState(null);
+  const [bytesProcessed, setBytesProcessed] = useState(null);
+  const [queryModalSql, setQueryModalSql]   = useState(null);
 
   const workIds = parseIds(rawInput);
 
-  const handleRun = async (config) => {
+  const handleRun = async () => {
     if (!workIds.length) return;
-    setTableStates(s => ({ ...s, [config.key]: { rows: null, loading: true, error: null, bytesProcessed: null } }));
+    setLoading(true);
+    setError(null);
+    setTableRows(null);
+    setBytesProcessed(null);
     try {
-      const data = await apiFetch(config.endpoint, {
+      const data = await apiFetch('/api/lab/citation-network', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ work_ids: workIds }),
       });
-      setTableStates(s => ({ ...s, [config.key]: { rows: data.rows, loading: false, error: null, bytesProcessed: data.bytes_processed } }));
+      const byType = {};
+      TABLE_CONFIGS.forEach(t => { byType[t.key] = []; });
+      (data.rows || []).forEach(r => {
+        if (byType[r.type]) byType[r.type].push(r);
+      });
+      setTableRows(byType);
+      setBytesProcessed(data.bytes_processed);
     } catch (e) {
-      setTableStates(s => ({ ...s, [config.key]: { rows: null, loading: false, error: e.message, bytesProcessed: null } }));
+      setError(e.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -187,6 +155,7 @@ export default function Lab({ projectId }) {
         <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: '.9rem', marginBottom: '.4rem' }}>Seed papers</div>
         <div style={{ fontSize: '.75rem', color: '#64748b', marginBottom: '.75rem' }}>
           OpenAlex integer work IDs (e.g. <code style={{ color: '#94a3b8' }}>2150220236</code>). One per line or comma-separated.
+          All four tables are populated by a single BigQuery query to minimise cost.
         </div>
         <textarea
           value={rawInput}
@@ -201,6 +170,30 @@ export default function Lab({ projectId }) {
             {workIds.length <= 5 ? ': ' + workIds.join(', ') : ': ' + workIds.slice(0, 5).join(', ') + ` … +${workIds.length - 5} more`}
           </div>
         )}
+        <div style={{ display: 'flex', gap: '.5rem', marginTop: '.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            className="btn"
+            style={{ fontSize: '.85rem' }}
+            onClick={handleRun}
+            disabled={loading || workIds.length === 0}
+          >
+            {loading ? 'Running…' : 'Run all'}
+          </button>
+          {tableRows && (
+            <button className="btn ghost" style={{ fontSize: '.72rem' }} onClick={() => setQueryModalSql(buildCitationNetworkQuery(workIds))}>
+              Export query
+            </button>
+          )}
+          {bytesProcessed != null && (
+            <span style={{ fontSize: '.72rem', color: '#475569' }}>{(bytesProcessed / 1e9).toFixed(2)} GB billed</span>
+          )}
+        </div>
+
+        {error && (
+          <div style={{ background: '#2d1515', border: '1px solid #7f1d1d', borderRadius: '6px', padding: '.65rem .85rem', fontSize: '.78rem', color: '#f87171', lineHeight: 1.5, marginTop: '.75rem' }}>
+            {error}
+          </div>
+        )}
       </div>
 
       <div className="results-grid">
@@ -208,12 +201,12 @@ export default function Lab({ projectId }) {
           <CitationTable
             key={config.key}
             config={config}
-            state={tableStates[config.key]}
-            workIds={workIds}
-            onRun={() => handleRun(config)}
+            rows={tableRows ? tableRows[config.key] : null}
           />
         ))}
       </div>
+
+      {queryModalSql && <QueryModal sql={queryModalSql} onClose={() => setQueryModalSql(null)} />}
     </div>
   );
 }

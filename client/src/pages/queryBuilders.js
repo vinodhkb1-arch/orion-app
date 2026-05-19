@@ -175,105 +175,76 @@ GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code, f.description
 ORDER BY works_count DESC`;
 }
 
-// ── Lab: citation network query builders ─────────────────────────────────────
-// No LIMIT — the 1000-row cap is applied server-side for the in-app table only.
+// ── Lab: citation network query builder ──────────────────────────────────────
 
-export function buildDirectCitationQuery(ids) {
+export function buildCitationNetworkQuery(ids) {
   const idList = ids.join(', ');
-  return `-- ORION Lab: direct citations · ${ids.length} seed paper${ids.length !== 1 ? 's' : ''}
--- Papers that cite the seeds, ranked by number of seeds cited.
+  return `-- ORION Lab: citation network · ${ids.length} seed paper${ids.length !== 1 ? 's' : ''}
+--
+-- Filter results by analysis type using the 'type' column:
+--   type = 'direct_citation'   → papers that cite your seeds
+--   type = 'co_citation'       → papers frequently cited alongside your seeds (Janssens & Gwinn 2015)
+--   type = 'direct_reference'  → papers in your seeds' bibliography
+--   type = 'bib_coupling'      → papers sharing references with your seeds
+--
+-- The in-app table shows the top 1000 results per type.
+-- To get more results, change or remove the "<= 1000" in the QUALIFY clause.
 
 WITH seed_papers AS (
     SELECT work_id FROM UNNEST([${idList}]) AS work_id
 ),
-scores AS (
-    SELECT c.citing_work_id AS work_id, COUNT(DISTINCT c.cited_work_id) AS score
-    FROM \`${ORION_SOURCE}.citation\` c
-    JOIN seed_papers s ON c.cited_work_id = s.work_id
-    GROUP BY c.citing_work_id
-)
-SELECT s.work_id, wt.title, w.pub_year, s.score
-FROM scores s
-LEFT JOIN \`${ORION_SOURCE}.work\` w ON s.work_id = w.work_id
-LEFT JOIN \`${ORION_SOURCE}.work_title\` wt ON s.work_id = wt.work_id
-ORDER BY s.score DESC`;
-}
-
-export function buildCoCitationQuery(ids) {
-  const idList = ids.join(', ');
-  return `-- ORION Lab: co-citation · ${ids.length} seed paper${ids.length !== 1 ? 's' : ''}
--- Based on Janssens & Gwinn (2015). Papers frequently cited together with the seeds.
-
-WITH seed_papers AS (
-    SELECT work_id FROM UNNEST([${idList}]) AS work_id
-),
-citing_papers AS (
-    SELECT DISTINCT c.citing_work_id
+citing_papers_raw AS (
+    SELECT c.citing_work_id, c.cited_work_id
     FROM \`${ORION_SOURCE}.citation\` c
     JOIN seed_papers s ON c.cited_work_id = s.work_id
 ),
-scores AS (
-    SELECT c.cited_work_id AS work_id, COUNT(*) AS score
+seed_references_raw AS (
+    SELECT c.cited_work_id, c.citing_work_id
     FROM \`${ORION_SOURCE}.citation\` c
-    JOIN citing_papers cp ON c.citing_work_id = cp.citing_work_id
+    JOIN seed_papers s ON c.citing_work_id = s.work_id
+),
+direct_citation AS (
+    SELECT 'direct_citation' AS type, r.citing_work_id AS work_id, COUNT(*) AS score
+    FROM citing_papers_raw r
+    LEFT JOIN seed_papers sp ON r.citing_work_id = sp.work_id
+    WHERE sp.work_id IS NULL
+    GROUP BY r.citing_work_id
+),
+direct_reference AS (
+    SELECT 'direct_reference' AS type, r.cited_work_id AS work_id, COUNT(*) AS score
+    FROM seed_references_raw r
+    LEFT JOIN seed_papers sp ON r.cited_work_id = sp.work_id
+    WHERE sp.work_id IS NULL
+    GROUP BY r.cited_work_id
+),
+co_citation AS (
+    SELECT 'co_citation' AS type, c.cited_work_id AS work_id, COUNT(*) AS score
+    FROM \`${ORION_SOURCE}.citation\` c
+    JOIN direct_citation dc ON c.citing_work_id = dc.work_id
     LEFT JOIN seed_papers sp ON c.cited_work_id = sp.work_id
     WHERE sp.work_id IS NULL
     GROUP BY c.cited_work_id
-)
-SELECT s.work_id, wt.title, w.pub_year, s.score
-FROM scores s
-LEFT JOIN \`${ORION_SOURCE}.work\` w ON s.work_id = w.work_id
-LEFT JOIN \`${ORION_SOURCE}.work_title\` wt ON s.work_id = wt.work_id
-ORDER BY s.score DESC`;
-}
-
-export function buildDirectReferenceQuery(ids) {
-  const idList = ids.join(', ');
-  return `-- ORION Lab: direct references · ${ids.length} seed paper${ids.length !== 1 ? 's' : ''}
--- Papers in the seeds' bibliography, ranked by how many seeds reference them.
-
-WITH seed_papers AS (
-    SELECT work_id FROM UNNEST([${idList}]) AS work_id
 ),
-scores AS (
-    SELECT c.cited_work_id AS work_id, COUNT(DISTINCT c.citing_work_id) AS score
+bib_coupling AS (
+    SELECT 'bib_coupling' AS type, c.citing_work_id AS work_id, COUNT(*) AS score
     FROM \`${ORION_SOURCE}.citation\` c
-    JOIN seed_papers s ON c.citing_work_id = s.work_id
-    GROUP BY c.cited_work_id
-)
-SELECT s.work_id, wt.title, w.pub_year, s.score
-FROM scores s
-LEFT JOIN \`${ORION_SOURCE}.work\` w ON s.work_id = w.work_id
-LEFT JOIN \`${ORION_SOURCE}.work_title\` wt ON s.work_id = wt.work_id
-ORDER BY s.score DESC`;
-}
-
-export function buildBibliographicCouplingQuery(ids) {
-  const idList = ids.join(', ');
-  return `-- ORION Lab: bibliographic coupling · ${ids.length} seed paper${ids.length !== 1 ? 's' : ''}
--- Papers sharing references with the seeds, ranked by number of shared references.
-
-WITH seed_papers AS (
-    SELECT work_id FROM UNNEST([${idList}]) AS work_id
-),
-seed_references AS (
-    SELECT DISTINCT c.cited_work_id
-    FROM \`${ORION_SOURCE}.citation\` c
-    JOIN seed_papers s ON c.citing_work_id = s.work_id
-),
-scores AS (
-    SELECT c.citing_work_id AS work_id, COUNT(DISTINCT c.cited_work_id) AS score
-    FROM \`${ORION_SOURCE}.citation\` c
-    JOIN seed_references sr ON c.cited_work_id = sr.cited_work_id
+    JOIN direct_reference dr ON c.cited_work_id = dr.work_id
     LEFT JOIN seed_papers sp ON c.citing_work_id = sp.work_id
     WHERE sp.work_id IS NULL
     GROUP BY c.citing_work_id
+),
+all_results AS (
+    SELECT * FROM direct_citation
+    UNION ALL SELECT * FROM co_citation
+    UNION ALL SELECT * FROM direct_reference
+    UNION ALL SELECT * FROM bib_coupling
 )
-SELECT s.work_id, wt.title, w.pub_year, s.score
-FROM scores s
-LEFT JOIN \`${ORION_SOURCE}.work\` w ON s.work_id = w.work_id
-LEFT JOIN \`${ORION_SOURCE}.work_title\` wt ON s.work_id = wt.work_id
-ORDER BY s.score DESC`;
+SELECT r.type, r.work_id, wt.title, w.pub_year, r.score
+FROM all_results r
+LEFT JOIN \`${ORION_SOURCE}.work\` w ON r.work_id = w.work_id
+LEFT JOIN \`${ORION_SOURCE}.work_title\` wt ON r.work_id = wt.work_id
+QUALIFY ROW_NUMBER() OVER (PARTITION BY r.type ORDER BY r.score DESC) <= 1000
+ORDER BY r.type, r.score DESC`;
 }
 
 // ── Topic / micro-cluster breakdown ──────────────────────────────────────────
