@@ -175,6 +175,107 @@ GROUP BY f.funder_id, f.funder, f.country_iso_alpha2_code, f.description
 ORDER BY works_count DESC`;
 }
 
+// ── Lab: citation network query builders ─────────────────────────────────────
+// No LIMIT — the 1000-row cap is applied server-side for the in-app table only.
+
+export function buildDirectCitationQuery(ids) {
+  const idList = ids.join(', ');
+  return `-- ORION Lab: direct citations · ${ids.length} seed paper${ids.length !== 1 ? 's' : ''}
+-- Papers that cite the seeds, ranked by number of seeds cited.
+
+WITH seed_papers AS (
+    SELECT work_id FROM UNNEST([${idList}]) AS work_id
+),
+scores AS (
+    SELECT c.citing_work_id AS work_id, COUNT(DISTINCT c.cited_work_id) AS score
+    FROM \`${ORION_SOURCE}.citation\` c
+    JOIN seed_papers s ON c.cited_work_id = s.work_id
+    GROUP BY c.citing_work_id
+)
+SELECT s.work_id, wt.title, w.pub_year, s.score
+FROM scores s
+LEFT JOIN \`${ORION_SOURCE}.work\` w ON s.work_id = w.work_id
+LEFT JOIN \`${ORION_SOURCE}.work_title\` wt ON s.work_id = wt.work_id
+ORDER BY s.score DESC`;
+}
+
+export function buildCoCitationQuery(ids) {
+  const idList = ids.join(', ');
+  return `-- ORION Lab: co-citation · ${ids.length} seed paper${ids.length !== 1 ? 's' : ''}
+-- Based on Janssens & Gwinn (2015). Papers frequently cited together with the seeds.
+
+WITH seed_papers AS (
+    SELECT work_id FROM UNNEST([${idList}]) AS work_id
+),
+citing_papers AS (
+    SELECT DISTINCT c.citing_work_id
+    FROM \`${ORION_SOURCE}.citation\` c
+    JOIN seed_papers s ON c.cited_work_id = s.work_id
+),
+scores AS (
+    SELECT c.cited_work_id AS work_id, COUNT(*) AS score
+    FROM \`${ORION_SOURCE}.citation\` c
+    JOIN citing_papers cp ON c.citing_work_id = cp.citing_work_id
+    LEFT JOIN seed_papers sp ON c.cited_work_id = sp.work_id
+    WHERE sp.work_id IS NULL
+    GROUP BY c.cited_work_id
+)
+SELECT s.work_id, wt.title, w.pub_year, s.score
+FROM scores s
+LEFT JOIN \`${ORION_SOURCE}.work\` w ON s.work_id = w.work_id
+LEFT JOIN \`${ORION_SOURCE}.work_title\` wt ON s.work_id = wt.work_id
+ORDER BY s.score DESC`;
+}
+
+export function buildDirectReferenceQuery(ids) {
+  const idList = ids.join(', ');
+  return `-- ORION Lab: direct references · ${ids.length} seed paper${ids.length !== 1 ? 's' : ''}
+-- Papers in the seeds' bibliography, ranked by how many seeds reference them.
+
+WITH seed_papers AS (
+    SELECT work_id FROM UNNEST([${idList}]) AS work_id
+),
+scores AS (
+    SELECT c.cited_work_id AS work_id, COUNT(DISTINCT c.citing_work_id) AS score
+    FROM \`${ORION_SOURCE}.citation\` c
+    JOIN seed_papers s ON c.citing_work_id = s.work_id
+    GROUP BY c.cited_work_id
+)
+SELECT s.work_id, wt.title, w.pub_year, s.score
+FROM scores s
+LEFT JOIN \`${ORION_SOURCE}.work\` w ON s.work_id = w.work_id
+LEFT JOIN \`${ORION_SOURCE}.work_title\` wt ON s.work_id = wt.work_id
+ORDER BY s.score DESC`;
+}
+
+export function buildBibliographicCouplingQuery(ids) {
+  const idList = ids.join(', ');
+  return `-- ORION Lab: bibliographic coupling · ${ids.length} seed paper${ids.length !== 1 ? 's' : ''}
+-- Papers sharing references with the seeds, ranked by number of shared references.
+
+WITH seed_papers AS (
+    SELECT work_id FROM UNNEST([${idList}]) AS work_id
+),
+seed_references AS (
+    SELECT DISTINCT c.cited_work_id
+    FROM \`${ORION_SOURCE}.citation\` c
+    JOIN seed_papers s ON c.citing_work_id = s.work_id
+),
+scores AS (
+    SELECT c.citing_work_id AS work_id, COUNT(DISTINCT c.cited_work_id) AS score
+    FROM \`${ORION_SOURCE}.citation\` c
+    JOIN seed_references sr ON c.cited_work_id = sr.cited_work_id
+    LEFT JOIN seed_papers sp ON c.citing_work_id = sp.work_id
+    WHERE sp.work_id IS NULL
+    GROUP BY c.citing_work_id
+)
+SELECT s.work_id, wt.title, w.pub_year, s.score
+FROM scores s
+LEFT JOIN \`${ORION_SOURCE}.work\` w ON s.work_id = w.work_id
+LEFT JOIN \`${ORION_SOURCE}.work_title\` wt ON s.work_id = wt.work_id
+ORDER BY s.score DESC`;
+}
+
 // ── Topic / micro-cluster breakdown ──────────────────────────────────────────
 
 const CLASSIFICATION = 'cwts-leiden.openalex_2023nov_classification';

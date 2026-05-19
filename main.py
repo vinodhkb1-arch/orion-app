@@ -983,6 +983,131 @@ def vos_build_funders(req: VosFunderRequest, request: Request):
     return JSONResponse({"token": token})
 
 
+# ── Lab (Experimental) ───────────────────────────────────────────────────────
+
+class LabWorksRequest(BaseModel):
+    work_ids: List[int]
+    limit: int = 1000
+
+@app.post("/api/lab/direct-citations")
+def lab_direct_citations(req: LabWorksRequest, request: Request):
+    """Papers that cite the given seeds, ranked by how many seeds they cite."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.work_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    rows, bp = run_query(f"""
+        WITH seed_papers AS (
+            SELECT work_id FROM UNNEST(@ids) AS work_id
+        ),
+        scores AS (
+            SELECT c.citing_work_id AS work_id, COUNT(DISTINCT c.cited_work_id) AS score
+            FROM `{SOURCE}.citation` c
+            JOIN seed_papers s ON c.cited_work_id = s.work_id
+            GROUP BY c.citing_work_id
+        )
+        SELECT s.work_id, wt.title, w.pub_year, s.score
+        FROM scores s
+        LEFT JOIN `{SOURCE}.work` w ON s.work_id = w.work_id
+        LEFT JOIN `{SOURCE}.work_title` wt ON s.work_id = wt.work_id
+        ORDER BY s.score DESC
+        LIMIT @limit
+    """, {"ids": req.work_ids, "limit": req.limit}, pid)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+
+@app.post("/api/lab/co-citations")
+def lab_co_citations(req: LabWorksRequest, request: Request):
+    """Co-citation: papers frequently cited in the same works as the seeds (Janssens & Gwinn 2015)."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.work_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    rows, bp = run_query(f"""
+        WITH seed_papers AS (
+            SELECT work_id FROM UNNEST(@ids) AS work_id
+        ),
+        citing_papers AS (
+            SELECT DISTINCT c.citing_work_id
+            FROM `{SOURCE}.citation` c
+            JOIN seed_papers s ON c.cited_work_id = s.work_id
+        ),
+        scores AS (
+            SELECT c.cited_work_id AS work_id, COUNT(*) AS score
+            FROM `{SOURCE}.citation` c
+            JOIN citing_papers cp ON c.citing_work_id = cp.citing_work_id
+            LEFT JOIN seed_papers sp ON c.cited_work_id = sp.work_id
+            WHERE sp.work_id IS NULL
+            GROUP BY c.cited_work_id
+        )
+        SELECT s.work_id, wt.title, w.pub_year, s.score
+        FROM scores s
+        LEFT JOIN `{SOURCE}.work` w ON s.work_id = w.work_id
+        LEFT JOIN `{SOURCE}.work_title` wt ON s.work_id = wt.work_id
+        ORDER BY s.score DESC
+        LIMIT @limit
+    """, {"ids": req.work_ids, "limit": req.limit}, pid)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+
+@app.post("/api/lab/direct-references")
+def lab_direct_references(req: LabWorksRequest, request: Request):
+    """Papers in the seeds' bibliography, ranked by how many seeds reference them."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.work_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    rows, bp = run_query(f"""
+        WITH seed_papers AS (
+            SELECT work_id FROM UNNEST(@ids) AS work_id
+        ),
+        scores AS (
+            SELECT c.cited_work_id AS work_id, COUNT(DISTINCT c.citing_work_id) AS score
+            FROM `{SOURCE}.citation` c
+            JOIN seed_papers s ON c.citing_work_id = s.work_id
+            GROUP BY c.cited_work_id
+        )
+        SELECT s.work_id, wt.title, w.pub_year, s.score
+        FROM scores s
+        LEFT JOIN `{SOURCE}.work` w ON s.work_id = w.work_id
+        LEFT JOIN `{SOURCE}.work_title` wt ON s.work_id = wt.work_id
+        ORDER BY s.score DESC
+        LIMIT @limit
+    """, {"ids": req.work_ids, "limit": req.limit}, pid)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+
+@app.post("/api/lab/bibliographic-coupling")
+def lab_bibliographic_coupling(req: LabWorksRequest, request: Request):
+    """Bibliographic coupling: papers sharing references with the seeds, ranked by shared ref count."""
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.work_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+    rows, bp = run_query(f"""
+        WITH seed_papers AS (
+            SELECT work_id FROM UNNEST(@ids) AS work_id
+        ),
+        seed_references AS (
+            SELECT DISTINCT c.cited_work_id
+            FROM `{SOURCE}.citation` c
+            JOIN seed_papers s ON c.citing_work_id = s.work_id
+        ),
+        scores AS (
+            SELECT c.citing_work_id AS work_id, COUNT(DISTINCT c.cited_work_id) AS score
+            FROM `{SOURCE}.citation` c
+            JOIN seed_references sr ON c.cited_work_id = sr.cited_work_id
+            LEFT JOIN seed_papers sp ON c.citing_work_id = sp.work_id
+            WHERE sp.work_id IS NULL
+            GROUP BY c.citing_work_id
+        )
+        SELECT s.work_id, wt.title, w.pub_year, s.score
+        FROM scores s
+        LEFT JOIN `{SOURCE}.work` w ON s.work_id = w.work_id
+        LEFT JOIN `{SOURCE}.work_title` wt ON s.work_id = wt.work_id
+        ORDER BY s.score DESC
+        LIMIT @limit
+    """, {"ids": req.work_ids, "limit": req.limit}, pid)
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+
+
 # ── Frontend ──────────────────────────────────────────────────────────────────
 
 BUILD_DIR = os.path.join(os.path.dirname(__file__), "client", "build")

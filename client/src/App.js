@@ -5,6 +5,7 @@ import Funders from './pages/Funders';
 import InstBasket from './pages/InstBasket';
 import FunderBasket from './pages/FunderBasket';
 import Guide from './pages/Guide';
+import Lab from './pages/Lab';
 import LoginGate from './pages/LoginGate';
 import ErrorPage from './pages/ErrorPage';
 import useBasket from './pages/useBasket';
@@ -98,6 +99,15 @@ export default function App() {
 
         {navTab('guide', 'Guide', 0)}
 
+        <a
+          href="#"
+          className={'nav-tab' + (page === 'lab' ? ' active' : '')}
+          style={page !== 'lab' ? { color: '#78350f' } : undefined}
+          onClick={e => { e.preventDefault(); setPage('lab'); }}
+        >
+          ⚗️ Lab
+        </a>
+
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span style={{ fontSize: '.75rem', color: '#475569' }} title={authState.email}>
             {authState.name || authState.email}
@@ -115,6 +125,7 @@ export default function App() {
       {page === 'inst-basket'   && <InstBasket basket={inst.basket} removeFromBasket={removeInst} clearBasket={clearInst} basketData={instBasketData} setBasketData={setInstBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} instBasket={inst.basket} funderBasket={funder.basket} setPage={setPage} projectId={authState.project_id} />}
       {page === 'funder-basket' && <FunderBasket basket={funder.basket} removeFromBasket={removeFunder} clearBasket={clearFunder} basketData={funderBasketData} setBasketData={setFunderBasketData} addInstToBasket={inst.addToBasket} addFunderToBasket={funder.addToBasket} instBasket={inst.basket} funderBasket={funder.basket} setPage={setPage} projectId={authState.project_id} />}
       {page === 'guide'         && <Guide />}
+      {page === 'lab'           && <Lab projectId={authState.project_id} />}
     </>
   );
 }
