@@ -148,7 +148,7 @@ export default function Lab({ projectId }) {
     <div className="page">
       <div style={{ background: '#1c1600', border: '1px solid #78350f', borderRadius: '8px', padding: '.7rem 1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '.65rem', fontSize: '.8rem', color: '#92400e' }}>
         <span>⚗️</span>
-        <span><strong style={{ color: '#d97706' }}>Lab — experimental</strong> · Queries and UI are unpolished and subject to change.</span>
+        <span><strong style={{ color: '#d97706' }}>Lab — experimental</strong> · Features here are implemented and functional but not yet fully integrated with the rest of the tool. Interfaces and query designs are subject to change.</span>
       </div>
 
       <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.5rem' }}>
