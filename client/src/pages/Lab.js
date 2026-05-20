@@ -153,9 +153,8 @@ export default function Lab({ projectId }) {
 
       <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.5rem' }}>
         <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: '.9rem', marginBottom: '.4rem' }}>Seed papers</div>
-        <div style={{ fontSize: '.75rem', color: '#64748b', marginBottom: '.75rem' }}>
-          OpenAlex integer work IDs (e.g. <code style={{ color: '#94a3b8' }}>2150220236</code>). One per line or comma-separated.
-          All four tables are populated by a single BigQuery query to minimise cost.
+        <div style={{ fontSize: '.75rem', color: '#64748b', marginBottom: '.75rem', lineHeight: 1.6 }}>
+          Enter one or more OpenAlex work IDs (integers, e.g. <code style={{ color: '#94a3b8' }}>2150220236</code>). To find a paper's ID, search for it on <a href="https://openalex.org" target="_blank" rel="noreferrer" style={{ color: '#7c8cff' }}>openalex.org</a> — the ID appears either in the URL as <code style={{ color: '#94a3b8' }}>openalex.org/works/W2150220236</code> or as a <code style={{ color: '#94a3b8' }}>zoom=W2150220236</code> parameter. The number after the <code style={{ color: '#94a3b8' }}>W</code> is the ID. One per line or comma-separated. All four tables below are populated by a single BigQuery query to minimise cost.
         </div>
         <textarea
           value={rawInput}
