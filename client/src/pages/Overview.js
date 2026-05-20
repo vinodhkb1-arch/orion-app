@@ -6,6 +6,7 @@ const NAV_CARDS = [
   { key: 'inst-basket',    icon: '🛒',  label: 'Institutions',  group: 'Basket'  },
   { key: 'funder-basket',  icon: '🛒',  label: 'Funders',       group: 'Basket'  },
   { key: 'guide',          icon: '📖',  label: 'Guide',         group: null      },
+  { key: 'lab',            icon: '⚗️',  label: 'Lab',           group: null      },
 ];
 
 function DatasetRow({ badge, name, href, desc }) {

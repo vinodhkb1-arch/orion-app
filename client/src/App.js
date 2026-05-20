@@ -99,14 +99,7 @@ export default function App() {
 
         {navTab('guide', 'Guide', 0)}
 
-        <a
-          href="#"
-          className={'nav-tab' + (page === 'lab' ? ' active' : '')}
-          style={page !== 'lab' ? { color: '#78350f' } : undefined}
-          onClick={e => { e.preventDefault(); setPage('lab'); }}
-        >
-          ⚗️ Lab
-        </a>
+        {navTab('lab', '⚗️ Lab', 0)}
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span style={{ fontSize: '.75rem', color: '#475569' }} title={authState.email}>
