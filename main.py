@@ -1056,6 +1056,241 @@ def lab_citation_network(req: LabWorksRequest, request: Request):
     return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
 
 
+# ── CARP — Contribution-Adjusted Research Performance ────────────────────────
+# Formula: CARP(a,p) = W(a,n) × FN(p) × FW(f) × CR(a)
+#
+# W(a,n)  Positional weight
+#   sole author          → 1.00
+#   first  (2 authors)  → 0.60 | last (2 authors)  → 0.40
+#   first  (3+authors)  → 0.40 | last (3+authors)  → 0.30
+#   middle (3+authors)  → 0.30 / (n − 2)
+#
+# FN(p)   Field-normalised citation score
+#   log10(1 + C) / log10(1 + μ_field_year)
+#
+# FW(f)   Field weight (corrects low-citation disciplines)
+#   STEM = 1.00 | Social Sciences = 1.20
+#   LIS / Humanities = 1.50 | Indigenous Knowledge = 1.60
+#
+# CR(a)   CRediT role multiplier — default 1.0 (no CRediT data in OpenAlex)
+#
+# Reference: Vinodh Kumar (2026). CARP metric. Zenodo.
+#            https://doi.org/10.5281/zenodo.20588564
+
+class CarpInstRequest(BaseModel):
+    institution_ids: List[int]
+    year_from: int = 2015
+    year_to: int = 2024
+    min_papers: int = 3
+    limit: int = 200
+
+@app.post("/api/carp/institutions")
+def carp_institutions(req: CarpInstRequest, request: Request):
+    """
+    CARP author-level scores for a basket of institutions.
+
+    Returns one row per author affiliated with any of the given institutions,
+    ranked by cumulative CARP score descending.
+
+    Each row contains:
+      author_id, author_name, total_papers, CARP_total, CARP_avg,
+      avg_FN, avg_W, top_fields, bytes_processed
+    """
+    session = require_auth(request)
+    pid = session["project_id"]
+    if not req.institution_ids:
+        return cached({"rows": [], "bytes_processed": 0}, CACHE_OFF)
+
+    ids  = req.institution_ids
+    yf   = req.year_from
+    yt   = req.year_to
+    minp = req.min_papers
+    lim  = req.limit
+
+    sql = f"""
+    -- ── Step 1: works belonging to the institution basket ───────────────────
+    WITH basket_works AS (
+        SELECT DISTINCT wai.work_id
+        FROM `{SOURCE}.work_affiliation_institution` wai
+        JOIN `{SOURCE}.work` w ON wai.work_id = w.work_id
+        WHERE wai.institution_id IN UNNEST(@ids)
+          AND w.pub_year BETWEEN @year_from AND @year_to
+    ),
+
+    -- ── Step 2: author positions for those works ─────────────────────────────
+    -- author_position.author_position is a STRING: 'first' | 'middle' | 'last'
+    -- author_seq counts all authors on each work (used for n_authors)
+    author_pos AS (
+        SELECT
+            ap.work_id,
+            ap.author_id,
+            ap.author_position                        AS position_label,
+            MAX(ap.author_seq) OVER (
+                PARTITION BY ap.work_id
+            )                                         AS n_authors
+        FROM `{SOURCE}.author_position` ap
+        INNER JOIN basket_works bw ON ap.work_id = bw.work_id
+    ),
+
+    -- ── Step 3: join work metadata ────────────────────────────────────────────
+    work_meta AS (
+        SELECT
+            ap.work_id,
+            ap.author_id,
+            ap.position_label,
+            ap.n_authors,
+            w.pub_year,
+            w.cited_by_count,
+            -- Primary field via work_topic → topic → subfield → field
+            f.field                                   AS field_name
+        FROM author_pos ap
+        JOIN `{SOURCE}.work` w
+            ON ap.work_id = w.work_id
+        LEFT JOIN `{SOURCE}.work_topic` wt
+            ON ap.work_id = wt.work_id AND wt.topic_rank = 1
+        LEFT JOIN `{SOURCE}.topic` t
+            ON wt.topic_id = t.topic_id
+        LEFT JOIN `{SOURCE}.subfield` sf
+            ON t.subfield_id = sf.subfield_id
+        LEFT JOIN `{SOURCE}.field` f
+            ON sf.field_id = f.field_id
+    ),
+
+    -- ── Step 4: field mean citations per year (for FN denominator) ───────────
+    field_means AS (
+        SELECT
+            w.pub_year,
+            f.field                                   AS field_name,
+            AVG(w.cited_by_count)                     AS mu
+        FROM `{SOURCE}.work` w
+        JOIN `{SOURCE}.work_topic` wt
+            ON w.work_id = wt.work_id AND wt.topic_rank = 1
+        JOIN `{SOURCE}.topic` t
+            ON wt.topic_id = t.topic_id
+        JOIN `{SOURCE}.subfield` sf
+            ON t.subfield_id = sf.subfield_id
+        JOIN `{SOURCE}.field` f
+            ON sf.field_id = f.field_id
+        WHERE w.pub_year BETWEEN @year_from AND @year_to
+          AND w.cited_by_count IS NOT NULL
+        GROUP BY w.pub_year, f.field
+    ),
+
+    -- ── Step 5: compute CARP components ─────────────────────────────────────
+    carp_components AS (
+        SELECT
+            wm.work_id,
+            wm.author_id,
+            wm.position_label,
+            wm.n_authors,
+            wm.pub_year,
+            wm.cited_by_count,
+            wm.field_name,
+            fm.mu                                     AS mu_field,
+
+            -- W(a,n): positional weight
+            CASE
+                WHEN wm.n_authors = 1
+                    THEN 1.00
+                WHEN wm.n_authors = 2 AND wm.position_label = 'first'
+                    THEN 0.60
+                WHEN wm.n_authors = 2 AND wm.position_label = 'last'
+                    THEN 0.40
+                WHEN wm.n_authors >= 3 AND wm.position_label = 'first'
+                    THEN 0.40
+                WHEN wm.n_authors >= 3 AND wm.position_label = 'last'
+                    THEN 0.30
+                WHEN wm.n_authors >= 3 AND wm.position_label = 'middle'
+                    THEN 0.30 / GREATEST(wm.n_authors - 2, 1)
+                ELSE 0.0
+            END                                       AS W_pos,
+
+            -- FN(p): field-normalised citation score
+            CASE
+                WHEN fm.mu IS NULL OR fm.mu = 0
+                    THEN LOG10(1 + wm.cited_by_count)
+                ELSE SAFE_DIVIDE(
+                    LOG10(1 + wm.cited_by_count),
+                    LOG10(1 + fm.mu)
+                )
+            END                                       AS FN_score,
+
+            -- FW(f): field weight
+            CASE
+                WHEN LOWER(wm.field_name) LIKE '%indigenous%'
+                  OR LOWER(wm.field_name) LIKE '%traditional knowledge%'
+                    THEN 1.60
+                WHEN LOWER(wm.field_name) LIKE '%library%'
+                  OR LOWER(wm.field_name) LIKE '%information science%'
+                  OR LOWER(wm.field_name) LIKE '%humanities%'
+                  OR LOWER(wm.field_name) LIKE '%arts%'
+                  OR LOWER(wm.field_name) LIKE '%literature%'
+                    THEN 1.50
+                WHEN LOWER(wm.field_name) LIKE '%social%'
+                  OR LOWER(wm.field_name) LIKE '%economics%'
+                  OR LOWER(wm.field_name) LIKE '%education%'
+                  OR LOWER(wm.field_name) LIKE '%psychology%'
+                  OR LOWER(wm.field_name) LIKE '%management%'
+                  OR LOWER(wm.field_name) LIKE '%business%'
+                    THEN 1.20
+                ELSE 1.00
+            END                                       AS FW_field
+
+        FROM work_meta wm
+        LEFT JOIN field_means fm
+            ON wm.pub_year = fm.pub_year
+           AND wm.field_name = fm.field_name
+        WHERE wm.cited_by_count IS NOT NULL
+    ),
+
+    -- ── Step 6: final CARP score per author-paper ────────────────────────────
+    carp_scores AS (
+        SELECT
+            *,
+            ROUND(W_pos * FN_score * FW_field * 1.0, 6) AS CARP_score
+        FROM carp_components
+        WHERE W_pos > 0
+    )
+
+    -- ── Final: aggregate to author level ─────────────────────────────────────
+    SELECT
+        cs.author_id,
+        a.author                                      AS author_name,
+        COUNT(DISTINCT cs.work_id)                    AS total_papers,
+        ROUND(SUM(cs.CARP_score), 4)                  AS CARP_total,
+        ROUND(AVG(cs.CARP_score), 4)                  AS CARP_avg,
+        ROUND(AVG(cs.FN_score),   4)                  AS avg_FN,
+        ROUND(AVG(cs.W_pos),      4)                  AS avg_W,
+        STRING_AGG(
+            DISTINCT cs.field_name
+            ORDER BY cs.field_name
+            LIMIT 3
+        )                                             AS top_fields
+
+    FROM carp_scores cs
+    LEFT JOIN `{SOURCE}.author` a ON cs.author_id = a.author_id
+
+    GROUP BY cs.author_id, a.author
+    HAVING COUNT(DISTINCT cs.work_id) >= @min_papers
+
+    ORDER BY CARP_total DESC
+    LIMIT @limit
+    """
+
+    rows, bp = run_query(
+        sql,
+        {
+            "ids":       ids,
+            "year_from": yf,
+            "year_to":   yt,
+            "min_papers": minp,
+            "limit":     lim,
+        },
+        pid,
+    )
+    return cached({"rows": rows, "bytes_processed": bp}, CACHE_OFF)
+
+
 # ── Frontend ──────────────────────────────────────────────────────────────────
 
 BUILD_DIR = os.path.join(os.path.dirname(__file__), "client", "build")
